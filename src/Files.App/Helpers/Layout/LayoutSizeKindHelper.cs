@@ -46,6 +46,7 @@ namespace Files.App.Helpers
 				// Grid
 				FolderLayoutModes.GridView when LayoutSettingsService.GridViewSize <= GridViewSizeKind.Small => 96,
 				FolderLayoutModes.GridView when LayoutSettingsService.GridViewSize <= GridViewSizeKind.Large => 128,
+				FolderLayoutModes.GridView => (uint)GetGridViewItemWidth(LayoutSettingsService.GridViewSize),
 
 				_ => 256,
 			};
@@ -101,13 +102,13 @@ namespace Files.App.Helpers
 				case GridViewSizeKind.Large:
 					return 220;
 				case GridViewSizeKind.Nine:
-					return 240;
+					return 320;
 				case GridViewSizeKind.Ten:
-					return 260;
+					return 480;
 				case GridViewSizeKind.Eleven:
-					return 280;
+					return 640;
 				case GridViewSizeKind.ExtraLarge:
-					return 300;
+					return 900;
 				default:
 					return 100;
 			}

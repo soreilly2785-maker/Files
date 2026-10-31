@@ -1,0 +1,101 @@
+# Copyright (c) Files Community
+# Licensed under the MIT License.
+
+name: Build Files with large thumbnails
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: windows-2025-vs2026
+    timeout-minutes: 60
+    defaults:
+      run:
+        shell: pwsh
+    env:
+      PACKAGE_DIR: ${{ github.workspace }}\artifacts\AppxPackages\
+      CERT_PATH: ${{ runner.temp }}\Files-LargeThumbnails.pfx
+
+    steps:
+      - uses: actions/checkout@v6
+      - uses: microsoft/setup-msbuild@v3
+      - uses: NuGet/setup-nuget@v3
+      - uses: actions/setup-dotnet@v5
+        with:
+          global-json-file: global.json
+
+      - name: Prepare development package and signing certificate
+        run: |
+          [xml]$manifest = Get-Content src/Files.App/Package.appxmanifest
+          $manifest.Package.Properties.DisplayName = 'Files - Large Thumbnails'
+          $manifest.Package.Applications.Application.VisualElements.DisplayName = 'Files - Large Thumbnails'
+          $manifest.Package.Applications.Application.VisualElements.DefaultTile.ShortName = 'Files - Large Thumbnails'
+          $manifest.Save((Join-Path $PWD 'src/Files.App/Package.appxmanifest'))
+          & ./.github/scripts/Generate-SelfCertPfx.ps1 -Destination $env:CERT_PATH
+          New-Item -ItemType Directory -Force -Path $env:PACKAGE_DIR | Out-Null
+          $cert = Get-PfxCertificate -FilePath $env:CERT_PATH
+          Export-Certificate -Cert $cert -FilePath (Join-Path $env:PACKAGE_DIR 'Files-LargeThumbnails.cer') | Out-Null
+
+      - name: Restore packages
+        run: |
+          msbuild Files.slnx -t:Restore -p:Configuration=Release -p:Platform=x64 -p:PublishReadyToRun=true -v:quiet -clp:ErrorsOnly
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Build and package x64 app
+        run: |
+          msbuild src/Files.App/Files.App.csproj `
+            -t:Build `
+            -p:Configuration=Release `
+            -p:Platform=x64 `
+            -p:AppxBundle=Never `
+            -p:GenerateAppxPackageOnBuild=true `
+            -p:UapAppxPackageBuildMode=SideloadOnly `
+            -p:AppxPackageDir="$env:PACKAGE_DIR" `
+            -p:AppxPackageSigningEnabled=true `
+            -p:PackageCertificateKeyFile="$env:CERT_PATH" `
+            -p:PackageCertificateThumbprint= `
+            -v:quiet -clp:ErrorsOnly
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Check package and write install instructions
+        run: |
+          $packages = @(Get-ChildItem $env:PACKAGE_DIR -Recurse -Filter *.msix | Where-Object { $_.FullName -notmatch '\\Dependencies\\' })
+          if ($packages.Count -eq 0) { throw 'No app MSIX package was generated.' }
+          foreach ($package in $packages) {
+            $signature = Get-AuthenticodeSignature $package.FullName
+            if ($null -eq $signature.SignerCertificate) { throw "Package is unsigned: $($package.Name)" }
+            Get-FileHash $package.FullName -Algorithm SHA256 | Format-List
+          }
+          @"
+          Files - Large Thumbnails (personal development build)
+          Source: https://github.com/${{ github.repository }}/commit/${{ github.sha }}
+
+          Extract this entire artifact ZIP before installing.
+          This is a self-signed development build, separate from stable Files.
+          To trust it, open Files-LargeThumbnails.cer and choose Install Certificate,
+          Local Machine, Place all certificates in the following store,
+          Trusted People. Windows will request administrator approval.
+          Only trust this certificate if you intend to install this build.
+
+          Run the generated Add-AppDevPackage.ps1 script if present, or open the
+          app MSIX package. The Dependencies folder contains framework packages
+          if Windows reports a missing runtime.
+
+          The largest grid preview is now 900 logical pixels. Ctrl+mouse wheel
+          stops at both size limits without switching the current layout.
+          This package has been compiled but needs interactive testing.
+          "@ | Set-Content (Join-Path $env:PACKAGE_DIR 'INSTALL.txt')
+
+      - name: Upload installable package
+        uses: actions/upload-artifact@v7
+        with:
+          name: Files-LargeThumbnails-x64
+          path: |
+            artifacts/AppxPackages/**
+            !artifacts/AppxPackages/**/*.pfx
+          if-no-files-found: error
+          retention-days: 7

@@ -91,12 +91,13 @@ namespace Files.App.ViewModels.Layouts
 			{
 				int delta = e.GetCurrentPoint(null).Properties.MouseWheelDelta;
 
+				// Keep wheel zoom within the current layout.
 				// Mouse wheel down
 				if (delta < 0)
-					Commands.LayoutDecreaseSize.ExecuteAsync();
+					Commands.LayoutDecreaseSize.ExecuteAsync(false);
 				// Mouse wheel up
 				else if (delta > 0)
-					Commands.LayoutIncreaseSize.ExecuteAsync();
+					Commands.LayoutIncreaseSize.ExecuteAsync(false);
 
 				e.Handled = true;
 			}

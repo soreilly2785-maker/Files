@@ -271,7 +271,9 @@ namespace Files.App.Actions
 					return Task.CompletedTask;
 			}
 
-			LayoutCycler.Cycle(folderSettings, instanceViewModel.IsPageTypeRecycleBin, forward: false);
+			// Pointer-wheel zoom disables cycling; keyboard commands retain it.
+			if (parameter is not false)
+				LayoutCycler.Cycle(folderSettings, instanceViewModel.IsPageTypeRecycleBin, forward: false);
 			return Task.CompletedTask;
 		}
 	}
@@ -338,7 +340,9 @@ namespace Files.App.Actions
 					return Task.CompletedTask;
 			}
 
-			LayoutCycler.Cycle(folderSettings, instanceViewModel.IsPageTypeRecycleBin, forward: true);
+			// Pointer-wheel zoom disables cycling; keyboard commands retain it.
+			if (parameter is not false)
+				LayoutCycler.Cycle(folderSettings, instanceViewModel.IsPageTypeRecycleBin, forward: true);
 			return Task.CompletedTask;
 		}
 	}
