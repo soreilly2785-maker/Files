@@ -31,9 +31,9 @@ jobs:
       - name: Prepare development package and signing certificate
         run: |
           [xml]$manifest = Get-Content src/Files.App/Package.appxmanifest
-          $manifest.Package.Properties.DisplayName = 'Files - Large Thumbnails'
-          $manifest.Package.Applications.Application.VisualElements.DisplayName = 'Files - Large Thumbnails'
-          $manifest.Package.Applications.Application.VisualElements.DefaultTile.ShortName = 'Files - Large Thumbnails'
+          $manifest.Package.Properties.DisplayName = 'Files'
+          $manifest.Package.Applications.Application.VisualElements.DisplayName = 'Files'
+          $manifest.Package.Applications.Application.VisualElements.DefaultTile.ShortName = 'Files'
           $manifest.Save((Join-Path $PWD 'src/Files.App/Package.appxmanifest'))
           & ./.github/scripts/Generate-SelfCertPfx.ps1 -Destination $env:CERT_PATH
           New-Item -ItemType Directory -Force -Path $env:PACKAGE_DIR | Out-Null
