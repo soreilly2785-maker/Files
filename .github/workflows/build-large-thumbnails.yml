@@ -18,7 +18,7 @@ jobs:
         shell: pwsh
     env:
       PACKAGE_DIR: ${{ github.workspace }}\artifacts\AppxPackages\
-      CERT_PATH: ${{ runner.temp }}\Files-LargeThumbnails.pfx
+      CERT_PATH: ${{ github.workspace }}\Files-LargeThumbnails.pfx
 
     steps:
       - uses: actions/checkout@v6
