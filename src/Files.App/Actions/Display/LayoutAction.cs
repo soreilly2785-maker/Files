@@ -263,8 +263,8 @@ namespace Files.App.Actions
 				case FolderLayoutModes.CardsView when settings.CardsViewSize > CardsViewSizeKind.Small:
 					settings.CardsViewSize -= 1;
 					return Task.CompletedTask;
-				case FolderLayoutModes.GridView when settings.GridViewSize > GridViewSizeKind.Small:
-					settings.GridViewSize -= 1;
+				case FolderLayoutModes.GridView when settings.GridViewItemWidth > LayoutSizeKindHelper.MinGridViewItemWidth:
+					settings.GridViewItemWidth -= LayoutSizeKindHelper.GridViewSizeStep;
 					return Task.CompletedTask;
 				case FolderLayoutModes.ColumnView when settings.ColumnsViewSize > ColumnsViewSizeKind.Compact:
 					settings.ColumnsViewSize -= 1;
@@ -332,8 +332,8 @@ namespace Files.App.Actions
 				case FolderLayoutModes.CardsView when settings.CardsViewSize < CardsViewSizeKind.ExtraLarge:
 					settings.CardsViewSize += 1;
 					return Task.CompletedTask;
-				case FolderLayoutModes.GridView when settings.GridViewSize < GridViewSizeKind.ExtraLarge:
-					settings.GridViewSize += 1;
+				case FolderLayoutModes.GridView when settings.GridViewItemWidth < LayoutSizeKindHelper.MaxGridViewItemWidth:
+					settings.GridViewItemWidth += LayoutSizeKindHelper.GridViewSizeStep;
 					return Task.CompletedTask;
 				case FolderLayoutModes.ColumnView when settings.ColumnsViewSize < ColumnsViewSizeKind.ExtraLarge:
 					settings.ColumnsViewSize += 1;

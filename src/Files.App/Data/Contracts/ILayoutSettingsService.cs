@@ -222,6 +222,11 @@ namespace Files.App.Data.Contracts
 		GridViewSizeKind GridViewSize { get; set; }
 
 		/// <summary>
+		/// Grid item width in logical pixels.
+		/// </summary>
+		int GridViewItemWidth { get; set; }
+
+		/// <summary>
 		/// Item size in the Columns View
 		/// </summary>
 		ColumnsViewSizeKind ColumnsViewSize { get; set; }

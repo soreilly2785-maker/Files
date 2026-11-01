@@ -625,13 +625,11 @@
 									<Slider
 										x:Name="GridViewSlider"
 										Padding="4,0,4,0"
-										Maximum="12"
-										Minimum="1"
-										SnapsTo="Ticks"
-										ThumbToolTipValueConverter="{StaticResource GridViewSizeKindEnumToHumanizedConverter}"
-										TickFrequency="1"
-										TickPlacement="BottomRight"
-										Value="{x:Bind UserSettingsService.LayoutSettingsService.GridViewSize, Mode=TwoWay, Converter={StaticResource GenericEnumConverter}, ConverterParameter='1-1,2-2,3-3,4-4,5-5,6-6,7-7,8-8,9-9,10-10,11-11,12-12'}" />
+										Maximum="900"
+										Minimum="80"
+										SmallChange="10"
+										StepFrequency="1"
+										Value="{x:Bind UserSettingsService.LayoutSettingsService.GridViewItemWidth, Mode=TwoWay}" />
 
 									<Grid HorizontalAlignment="Stretch">
 										<Grid.ColumnDefinitions>

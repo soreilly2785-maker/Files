@@ -5,6 +5,10 @@ namespace Files.App.Helpers
 {
 	public static class LayoutSizeKindHelper
 	{
+		public const int MinGridViewItemWidth = 80;
+		public const int MaxGridViewItemWidth = 900;
+		public const int GridViewSizeStep = 10;
+
 		private static ILayoutSettingsService LayoutSettingsService { get; } = Ioc.Default.GetRequiredService<ILayoutSettingsService>();
 
 		/// <summary>
@@ -44,9 +48,8 @@ namespace Files.App.Helpers
 				FolderLayoutModes.CardsView when LayoutSettingsService.CardsViewSize == CardsViewSizeKind.ExtraLarge => 96,
 
 				// Grid
-				FolderLayoutModes.GridView when LayoutSettingsService.GridViewSize <= GridViewSizeKind.Small => 96,
-				FolderLayoutModes.GridView when LayoutSettingsService.GridViewSize <= GridViewSizeKind.Large => 128,
-				FolderLayoutModes.GridView => (uint)GetGridViewItemWidth(LayoutSettingsService.GridViewSize),
+				// Share image resolutions across nearby sizes to avoid reloading thumbnails on every zoom step.
+				FolderLayoutModes.GridView => (uint)(Math.Ceiling(LayoutSettingsService.GridViewItemWidth / 128d) * 128),
 
 				_ => 256,
 			};

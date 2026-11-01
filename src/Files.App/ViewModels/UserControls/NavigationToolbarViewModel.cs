@@ -124,28 +124,28 @@ namespace Files.App.ViewModels.UserControls
 			(IsListLayout && UserSettingsService.LayoutSettingsService.ListViewSize == ListViewSizeKind.Small) ||
 			(IsColumnLayout && UserSettingsService.LayoutSettingsService.ColumnsViewSize == ColumnsViewSizeKind.Small) ||
 			(IsCardsLayout && UserSettingsService.LayoutSettingsService.CardsViewSize == CardsViewSizeKind.Small) ||
-			(IsGridLayout && UserSettingsService.LayoutSettingsService.GridViewSize == GridViewSizeKind.Small);
+			(IsGridLayout && UserSettingsService.LayoutSettingsService.GridViewItemWidth == LayoutSizeKindHelper.GetGridViewItemWidth(GridViewSizeKind.Small));
 
 		public bool IsLayoutSizeMedium =>
 			(IsDetailsLayout && UserSettingsService.LayoutSettingsService.DetailsViewSize == DetailsViewSizeKind.Medium) ||
 			(IsListLayout && UserSettingsService.LayoutSettingsService.ListViewSize == ListViewSizeKind.Medium) ||
 			(IsColumnLayout && UserSettingsService.LayoutSettingsService.ColumnsViewSize == ColumnsViewSizeKind.Medium) ||
 			(IsCardsLayout && UserSettingsService.LayoutSettingsService.CardsViewSize == CardsViewSizeKind.Medium) ||
-			(IsGridLayout && UserSettingsService.LayoutSettingsService.GridViewSize == GridViewSizeKind.Medium);
+			(IsGridLayout && UserSettingsService.LayoutSettingsService.GridViewItemWidth == LayoutSizeKindHelper.GetGridViewItemWidth(GridViewSizeKind.Medium));
 
 		public bool IsLayoutSizeLarge =>
 			(IsDetailsLayout && UserSettingsService.LayoutSettingsService.DetailsViewSize == DetailsViewSizeKind.Large) ||
 			(IsListLayout && UserSettingsService.LayoutSettingsService.ListViewSize == ListViewSizeKind.Large) ||
 			(IsColumnLayout && UserSettingsService.LayoutSettingsService.ColumnsViewSize == ColumnsViewSizeKind.Large) ||
 			(IsCardsLayout && UserSettingsService.LayoutSettingsService.CardsViewSize == CardsViewSizeKind.Large) ||
-			(IsGridLayout && UserSettingsService.LayoutSettingsService.GridViewSize == GridViewSizeKind.Large);
+			(IsGridLayout && UserSettingsService.LayoutSettingsService.GridViewItemWidth == LayoutSizeKindHelper.GetGridViewItemWidth(GridViewSizeKind.Large));
 
 		public bool IsLayoutSizeExtraLarge =>
 			(IsDetailsLayout && UserSettingsService.LayoutSettingsService.DetailsViewSize == DetailsViewSizeKind.ExtraLarge) ||
 			(IsListLayout && UserSettingsService.LayoutSettingsService.ListViewSize == ListViewSizeKind.ExtraLarge) ||
 			(IsColumnLayout && UserSettingsService.LayoutSettingsService.ColumnsViewSize == ColumnsViewSizeKind.ExtraLarge) ||
 			(IsCardsLayout && UserSettingsService.LayoutSettingsService.CardsViewSize == CardsViewSizeKind.ExtraLarge) ||
-			(IsGridLayout && UserSettingsService.LayoutSettingsService.GridViewSize == GridViewSizeKind.ExtraLarge);
+			(IsGridLayout && UserSettingsService.LayoutSettingsService.GridViewItemWidth == LayoutSizeKindHelper.GetGridViewItemWidth(GridViewSizeKind.ExtraLarge));
 
 		private bool _IsDynamicOverflowEnabled;
 		public bool IsDynamicOverflowEnabled { get => _IsDynamicOverflowEnabled; set => SetProperty(ref _IsDynamicOverflowEnabled, value); }
@@ -417,6 +417,7 @@ namespace Files.App.ViewModels.UserControls
 				case nameof(UserSettingsService.LayoutSettingsService.ColumnsViewSize):
 				case nameof(UserSettingsService.LayoutSettingsService.CardsViewSize):
 				case nameof(UserSettingsService.LayoutSettingsService.GridViewSize):
+				case nameof(UserSettingsService.LayoutSettingsService.GridViewItemWidth):
 					OnPropertyChanged(nameof(IsLayoutSizeCompact));
 					OnPropertyChanged(nameof(IsLayoutSizeSmall));
 					OnPropertyChanged(nameof(IsLayoutSizeMedium));

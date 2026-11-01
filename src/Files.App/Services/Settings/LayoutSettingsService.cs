@@ -322,7 +322,19 @@ namespace Files.App.Services.Settings
 		public GridViewSizeKind GridViewSize
 		{
 			get => Get(GridViewSizeKind.Large);
-			set => Set(value);
+			set
+			{
+				Set(value);
+				GridViewItemWidth = LayoutSizeKindHelper.GetGridViewItemWidth(value);
+			}
+		}
+
+		public int GridViewItemWidth
+		{
+			// Preserve the existing size until a precise width has been saved.
+			get => Math.Clamp(Get(LayoutSizeKindHelper.GetGridViewItemWidth(GridViewSize)),
+				LayoutSizeKindHelper.MinGridViewItemWidth, LayoutSizeKindHelper.MaxGridViewItemWidth);
+			set => Set(Math.Clamp(value, LayoutSizeKindHelper.MinGridViewItemWidth, LayoutSizeKindHelper.MaxGridViewItemWidth));
 		}
 
 		public ColumnsViewSizeKind ColumnsViewSize

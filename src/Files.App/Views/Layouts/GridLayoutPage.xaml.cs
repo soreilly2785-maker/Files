@@ -47,7 +47,7 @@ namespace Files.App.Views.Layouts
 		/// size changes, even if the layout size changes (since some layout sizes share the same icon size).
 		/// </summary>
 		private uint currentIconSize;
-		private (FolderLayoutModes? Layout, ListViewSizeKind List, CardsViewSizeKind Cards, GridViewSizeKind Grid)? itemContainerLayout;
+		private (FolderLayoutModes? Layout, ListViewSizeKind List, CardsViewSizeKind Cards, int Grid)? itemContainerLayout;
 
 		private volatile bool shouldSetVerticalScrollMode;
 
@@ -85,7 +85,7 @@ namespace Files.App.Views.Layouts
 		/// Item width in the Grid View layout
 		/// </summary>
 		public int ItemWidthGridView =>
-			LayoutSizeKindHelper.GetGridViewItemWidth(LayoutSettingsService.GridViewSize);
+			LayoutSettingsService.GridViewItemWidth;
 
 		/// <summary>
 		/// Gets the icon size for items in the Grid View layout.
@@ -293,8 +293,9 @@ namespace Files.App.Views.Layouts
 				SetItemContainerStyle();
 				FolderSettings_IconSizeChanged();
 			}
-			if (e.PropertyName == nameof(ILayoutSettingsService.GridViewSize))
+			if (e.PropertyName == nameof(ILayoutSettingsService.GridViewItemWidth))
 			{
+				NotifyPropertyChanged(nameof(ItemWidthGridView));
 				NotifyPropertyChanged(nameof(GridViewIconSize));
 
 				// Update the container style to match the item size
@@ -375,7 +376,7 @@ namespace Files.App.Views.Layouts
 
 		private void SetItemContainerStyle()
 		{
-			var layout = (FolderSettings?.LayoutMode, LayoutSettingsService.ListViewSize, LayoutSettingsService.CardsViewSize, LayoutSettingsService.GridViewSize);
+			var layout = (FolderSettings?.LayoutMode, LayoutSettingsService.ListViewSize, LayoutSettingsService.CardsViewSize, LayoutSettingsService.GridViewItemWidth);
 			if (itemContainerLayout == layout)
 				return;
 
