@@ -13,6 +13,33 @@ namespace Files.App.Helpers
 {
 	internal static class BitmapHelper
 	{
+		public static async Task<BitmapImage?> ToThumbnailBitmapAsync(this byte[]? data, uint requestedSize)
+		{
+			if (data is null)
+				return null;
+
+			try
+			{
+				using var memory = new MemoryStream(data);
+				using var stream = memory.AsRandomAccessStream();
+				var decoder = await BitmapDecoder.CreateAsync(stream);
+				var limit = (uint)Math.Clamp(Math.Ceiling(requestedSize * App.AppModel.AppWindowDPI), 1d, 1024d);
+				var image = new BitmapImage { DecodePixelType = DecodePixelType.Physical };
+				// Bound the longer edge and let the decoder preserve the image's aspect ratio.
+				if (decoder.PixelWidth >= decoder.PixelHeight)
+					image.DecodePixelWidth = (int)Math.Min(limit, decoder.PixelWidth);
+				else
+					image.DecodePixelHeight = (int)Math.Min(limit, decoder.PixelHeight);
+				stream.Seek(0);
+				await image.SetSourceAsync(stream);
+				return image;
+			}
+			catch (Exception)
+			{
+				return null;
+			}
+		}
+
 		public static async Task<BitmapImage?> ToBitmapAsync(this byte[]? data, int decodeSize = -1)
 		{
 			if (data is null)

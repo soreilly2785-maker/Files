@@ -35,6 +35,8 @@ namespace Files.App.Utils
 
 		public bool NeedsDelayedThumbnailLoad { get; set; }
 
+		internal int ThumbnailLoadVersion;
+
 		private volatile int itemPropertiesInitialized = 0;
 		public bool ItemPropertiesInitialized
 		{
