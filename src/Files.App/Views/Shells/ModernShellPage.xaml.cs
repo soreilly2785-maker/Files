@@ -258,6 +258,7 @@ namespace Files.App.Views.Shells
 					new NavigationArguments()
 					{
 						NavPathParam = parentDirectoryOfPath,
+						RestoreScrollPosition = true,
 						AssociatedTabInstance = this
 					},
 					new SuppressNavigationTransitionInfo());

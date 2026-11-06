@@ -27,6 +27,8 @@ namespace Files.App.Data.EventArguments
 
 		public bool IsLayoutSwitch { get; set; } = false;
 
+		public bool RestoreScrollPosition { get; set; }
+
 		public IEnumerable<string>? SelectItems { get; set; }
 	}
 }

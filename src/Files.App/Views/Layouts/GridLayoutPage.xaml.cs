@@ -85,13 +85,13 @@ namespace Files.App.Views.Layouts
 		/// Item width in the Grid View layout
 		/// </summary>
 		public int ItemWidthGridView =>
-			LayoutSettingsService.GridViewItemWidth;
+			FolderSettings?.GridViewItemWidth ?? LayoutSettingsService.GridViewItemWidth;
 
 		/// <summary>
 		/// Gets the icon size for items in the Grid View layout.
 		/// </summary>
 		public int GridViewIconSize =>
-			(int)LayoutSizeKindHelper.GetIconSize(FolderLayoutModes.GridView);
+			(int)LayoutSizeKindHelper.GetIconSize(FolderLayoutModes.GridView, ItemWidthGridView);
 
 
 
@@ -236,10 +236,11 @@ namespace Files.App.Views.Layouts
 			var folderSettings = FolderSettings
 				?? throw new InvalidOperationException("The grid layout requires folder settings.");
 
-			currentIconSize = LayoutSizeKindHelper.GetIconSize(folderSettings.LayoutMode);
+			currentIconSize = LayoutSizeKindHelper.GetIconSize(folderSettings.LayoutMode, folderSettings.GridViewItemWidth);
 
 			folderSettings.LayoutModeChangeRequested -= FolderSettings_LayoutModeChangeRequested;
 			folderSettings.LayoutModeChangeRequested += FolderSettings_LayoutModeChangeRequested;
+			folderSettings.PropertyChanged += FolderSettings_PropertyChanged;
 			UserSettingsService.LayoutSettingsService.PropertyChanged += LayoutSettingsService_PropertyChanged;
 
 			// Set ItemTemplate
@@ -257,7 +258,10 @@ namespace Files.App.Views.Layouts
 			base.OnNavigatingFrom(e);
 
 			if (FolderSettings != null)
+			{
 				FolderSettings.LayoutModeChangeRequested -= FolderSettings_LayoutModeChangeRequested;
+				FolderSettings.PropertyChanged -= FolderSettings_PropertyChanged;
+			}
 
 			UserSettingsService.LayoutSettingsService.PropertyChanged -= LayoutSettingsService_PropertyChanged;
 		}
@@ -266,7 +270,10 @@ namespace Files.App.Views.Layouts
 		{
 			Bindings.StopTracking();
 			if (FolderSettings is not null)
+			{
 				FolderSettings.LayoutModeChangeRequested -= FolderSettings_LayoutModeChangeRequested;
+				FolderSettings.PropertyChanged -= FolderSettings_PropertyChanged;
+			}
 
 			UserSettingsService.LayoutSettingsService.PropertyChanged -= LayoutSettingsService_PropertyChanged;
 			base.Dispose();
@@ -293,7 +300,7 @@ namespace Files.App.Views.Layouts
 				SetItemContainerStyle();
 				FolderSettings_IconSizeChanged();
 			}
-			if (e.PropertyName == nameof(ILayoutSettingsService.GridViewItemWidth))
+			if (e.PropertyName == nameof(LayoutPreferencesManager.GridViewItemWidth))
 			{
 				NotifyPropertyChanged(nameof(ItemWidthGridView));
 				NotifyPropertyChanged(nameof(GridViewIconSize));
@@ -305,6 +312,16 @@ namespace Files.App.Views.Layouts
 
 			// Restore correct scroll position
 			ContentScroller?.ChangeView(previousHorizontalOffset, previousVerticalOffset, null);
+		}
+
+		private void FolderSettings_PropertyChanged(object? sender, PropertyChangedEventArgs e)
+		{
+			// Navigation prepares the next folder's preferences before this page leaves.
+			if (!string.Equals(FolderSettings?.PreferencesPath, navigationArguments?.NavPathParam, StringComparison.OrdinalIgnoreCase))
+				return;
+
+			if (e.PropertyName == nameof(LayoutPreferencesManager.GridViewItemWidth))
+				LayoutSettingsService_PropertyChanged(sender, e);
 		}
 
 		private void FolderSettings_LayoutModeChangeRequested(object? sender, LayoutModeEventArgs e)
@@ -376,7 +393,7 @@ namespace Files.App.Views.Layouts
 
 		private void SetItemContainerStyle()
 		{
-			var layout = (FolderSettings?.LayoutMode, LayoutSettingsService.ListViewSize, LayoutSettingsService.CardsViewSize, LayoutSettingsService.GridViewItemWidth);
+			var layout = (FolderSettings?.LayoutMode, LayoutSettingsService.ListViewSize, LayoutSettingsService.CardsViewSize, ItemWidthGridView);
 			if (itemContainerLayout == layout)
 				return;
 
@@ -672,7 +689,7 @@ namespace Files.App.Views.Layouts
 				?? throw new InvalidOperationException("The grid layout does not have folder settings.");
 
 			// Check if icons need to be reloaded
-			var newIconSize = LayoutSizeKindHelper.GetIconSize(folderSettings.LayoutMode);
+			var newIconSize = LayoutSizeKindHelper.GetIconSize(folderSettings.LayoutMode, folderSettings.GridViewItemWidth);
 			if (newIconSize != currentIconSize)
 			{
 				currentIconSize = newIconSize;

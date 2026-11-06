@@ -63,6 +63,9 @@ namespace Files.App.Views.Layouts
 
 		protected NavigationArguments? navigationArguments;
 
+		private (double Horizontal, double Vertical)? pendingScrollPosition;
+		private bool navigationItemsLoaded;
+
 		private CancellationTokenSource? shellContextMenuItemCancellationToken;
 		private CancellationTokenSource? groupingCancellationToken;
 
@@ -518,6 +521,12 @@ namespace Files.App.Views.Layouts
 			}
 
 			navigationArguments = args;
+			navigationItemsLoaded = args.IsLayoutSwitch;
+			pendingScrollPosition = !args.IsSearchResultPage &&
+				(e.NavigationMode is NavigationMode.Back or NavigationMode.Forward || args.RestoreScrollPosition) &&
+				args.NavPathParam is { } scrollPath &&
+				parentShellPage.InstanceViewModel.FolderScrollPositions.TryGetValue(scrollPath.TrimEnd('\\', '/'), out var savedPosition)
+				? savedPosition : null;
 			ParentShellPageInstance = parentShellPage;
 			var folderSettings = parentShellPage.InstanceViewModel.FolderSettings;
 
@@ -573,7 +582,13 @@ namespace Files.App.Views.Layouts
 					folderSettings.DirectoryGroupOption = GroupOption.None;
 
 				if (!args.IsLayoutSwitch || previousDir != workingDir)
-					shellViewModel.RefreshItems(previousDir, SetSelectedItemsOnNavigation);
+					shellViewModel.RefreshItems(previousDir, () =>
+					{
+						if (navigationArguments != args)
+							return;
+						navigationItemsLoaded = true;
+						SetSelectedItemsOnNavigation();
+					});
 				else
 					parentShellPage.ToolbarViewModel.CanGoForward = false;
 			}
@@ -868,8 +883,30 @@ namespace Files.App.Views.Layouts
 					if (!UIHelpers.IsTextInputFocused(XamlRoot))
 						parentShellPage.PaneHolder?.FocusActivePane();
 				}
+
+				RestoreFolderScrollPosition();
 			}
 			catch (Exception) { }
+		}
+
+		private void RestoreFolderScrollPosition()
+		{
+			if (!navigationItemsLoaded || pendingScrollPosition is not { } position || navigationArguments is not { } args)
+				return;
+
+			DispatcherQueue.TryEnqueue(Microsoft.UI.Dispatching.DispatcherQueuePriority.Low, () =>
+			{
+				if (isDisposed || navigationArguments != args || pendingScrollPosition is null)
+					return;
+
+				ItemsControl.UpdateLayout();
+				var scroller = ItemsControl.FindDescendant<ScrollViewer>();
+				if (scroller is null)
+					return;
+
+				pendingScrollPosition = null;
+				scroller.ChangeView(position.Horizontal, position.Vertical, null, true);
+			});
 		}
 
 		private async void FolderSettings_GroupOptionPreferenceUpdated(object? sender, GroupOption e)
@@ -906,6 +943,19 @@ namespace Files.App.Views.Layouts
 		protected override void OnNavigatingFrom(NavigatingCancelEventArgs e)
 		{
 			base.OnNavigatingFrom(e);
+			if (navigationArguments is { IsSearchResultPage: false, NavPathParam: { } path } &&
+				ParentShellPageInstance is { } shell && pendingScrollPosition is null)
+			{
+				var scroller = ItemsControl.FindDescendant<ScrollViewer>();
+				if (scroller is not null)
+				{
+					var positions = shell.InstanceViewModel.FolderScrollPositions;
+					var key = path.TrimEnd('\\', '/');
+					if (positions.Count >= 256 && !positions.ContainsKey(key))
+						positions.Remove(positions.Keys.First());
+					positions[key] = (scroller.HorizontalOffset, scroller.VerticalOffset);
+				}
+			}
 			navigationArguments = null;
 
 			// Remove item jumping handler

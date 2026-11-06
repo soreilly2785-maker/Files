@@ -1397,7 +1397,7 @@ namespace Files.App.ViewModels
 				&& FileExtensionHelpers.IsImageFile(item.FileExtension)
 				&& UserSettingsService.FoldersSettingsService.ShowThumbnails)
 			{
-				var thumbnailSize = LayoutSizeKindHelper.GetIconSize(folderSettings.LayoutMode);
+				var thumbnailSize = LayoutSizeKindHelper.GetIconSize(folderSettings.LayoutMode, folderSettings.GridViewItemWidth);
 				if (thumbnailSize >= 48)
 				{
 					var cached = await FileThumbnailHelper.GetIconAsync(
@@ -1437,12 +1437,12 @@ namespace Files.App.ViewModels
 		}
 
 		private uint GetPreloadIconSize()
-			=> LayoutSizeKindHelper.GetIconSize(folderSettings.LayoutMode);
+			=> LayoutSizeKindHelper.GetIconSize(folderSettings.LayoutMode, folderSettings.GridViewItemWidth);
 
 		private async Task LoadThumbnailAsync(ListedItem item, CancellationToken cancellationToken, bool scheduleTimerRetry = true)
 		{
 			var loadNonCachedThumbnail = false;
-			var thumbnailSize = LayoutSizeKindHelper.GetIconSize(folderSettings.LayoutMode);
+			var thumbnailSize = LayoutSizeKindHelper.GetIconSize(folderSettings.LayoutMode, folderSettings.GridViewItemWidth);
 			var returnIconOnly = UserSettingsService.FoldersSettingsService.ShowThumbnails == false || thumbnailSize < 48;
 
 			byte[]? result = null;

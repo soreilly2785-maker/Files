@@ -629,7 +629,7 @@
 										Minimum="80"
 										SmallChange="10"
 										StepFrequency="1"
-										Value="{x:Bind UserSettingsService.LayoutSettingsService.GridViewItemWidth, Mode=TwoWay}" />
+										Value="{x:Bind ViewModel.GridViewItemWidth, Mode=TwoWay}" />
 
 									<Grid HorizontalAlignment="Stretch">
 										<Grid.ColumnDefinitions>

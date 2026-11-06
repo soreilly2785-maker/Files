@@ -22,6 +22,8 @@ namespace Files.App.Helpers
 		private readonly FolderLayoutModes? _rootLayoutMode;
 
 		// Properties
+		public string? PreferencesPath { get; private set; }
+
 		public bool IsLayoutModeFixed
 			=> _rootLayoutMode is not null;
 
@@ -41,6 +43,18 @@ namespace Files.App.Helpers
 			set
 			{
 				if (SetProperty(item => item.LayoutMode, item => item.LayoutMode = value, nameof(LayoutMode)))
+					LayoutPreferencesUpdateRequired?.Invoke(this, new LayoutPreferenceEventArgs(LayoutPreferencesItem));
+			}
+		}
+
+		public int GridViewItemWidth
+		{
+			get => Math.Clamp(LayoutPreferencesItem.GridViewItemWidth,
+				LayoutSizeKindHelper.MinGridViewItemWidth, LayoutSizeKindHelper.MaxGridViewItemWidth);
+			set
+			{
+				value = Math.Clamp(value, LayoutSizeKindHelper.MinGridViewItemWidth, LayoutSizeKindHelper.MaxGridViewItemWidth);
+				if (SetProperty(item => item.GridViewItemWidth, item => item.GridViewItemWidth = value, nameof(GridViewItemWidth)))
 					LayoutPreferencesUpdateRequired?.Invoke(this, new LayoutPreferenceEventArgs(LayoutPreferencesItem));
 			}
 		}
@@ -165,6 +179,7 @@ namespace Files.App.Helpers
 				if (SetProperty(ref _LayoutPreferencesItem, value))
 				{
 					OnPropertyChanged(nameof(LayoutMode));
+					OnPropertyChanged(nameof(GridViewItemWidth));
 					OnPropertyChanged(nameof(IsAdaptiveLayoutEnabled));
 					OnPropertyChanged(nameof(DirectoryGroupOption));
 					OnPropertyChanged(nameof(DirectorySortOption));
@@ -222,6 +237,7 @@ namespace Files.App.Helpers
 
 			if (changeLayoutMode)
 			{
+				PreferencesPath = path;
 				IsLayoutModeChanging = LayoutPreferencesItem.LayoutMode != preferencesItem.LayoutMode;
 				LayoutPreferencesItem = preferencesItem;
 			}
@@ -396,6 +412,7 @@ namespace Files.App.Helpers
 			}
 			else
 			{
+				UserSettingsService.LayoutSettingsService.GridViewItemWidth = preferencesItem.GridViewItemWidth;
 				UserSettingsService.LayoutSettingsService.DefaultLayoutMode = preferencesItem.LayoutMode;
 
 				// Do not save options which only work in recycle bin or cloud folders or search results as global

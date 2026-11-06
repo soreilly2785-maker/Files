@@ -22,6 +22,8 @@ namespace Files.App.Helpers
 
 		public FolderLayoutModes LayoutMode { get; set; }
 
+		public int GridViewItemWidth { get; set; }
+
 		public SortOption DirectorySortOption { get; set; }
 		public SortDirection DirectorySortDirection { get; set; }
 		public SortDirection DirectoryGroupDirection { get; set; }
@@ -35,6 +37,7 @@ namespace Files.App.Helpers
 		{
 			var defaultLayout = UserSettingsService.LayoutSettingsService.DefaultLayoutMode;
 
+			GridViewItemWidth = UserSettingsService.LayoutSettingsService.GridViewItemWidth;
 			LayoutMode = defaultLayout is FolderLayoutModes.Adaptive ? FolderLayoutModes.DetailsView : defaultLayout;
 			DirectorySortOption = UserSettingsService.LayoutSettingsService.DefaultSortOption;
 			DirectoryGroupOption = UserSettingsService.LayoutSettingsService.DefaultGroupOption;
@@ -92,6 +95,7 @@ namespace Files.App.Helpers
 			{
 				return (
 					item.LayoutMode == LayoutMode &&
+					item.GridViewItemWidth == GridViewItemWidth &&
 					item.DirectoryGroupOption == DirectoryGroupOption &&
 					item.DirectorySortOption == DirectorySortOption &&
 					item.DirectorySortDirection == DirectorySortDirection &&
@@ -110,6 +114,7 @@ namespace Files.App.Helpers
 			HashCode hash = new();
 
 			hash.Add(LayoutMode);
+			hash.Add(GridViewItemWidth);
 			hash.Add(DirectoryGroupOption);
 			hash.Add(DirectorySortOption);
 			hash.Add(DirectorySortDirection);

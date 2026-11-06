@@ -108,6 +108,16 @@ namespace Files.App.ViewModels.UserControls
 
 		public bool CanExtract => Commands.DecompressArchive.CanExecute(null) || Commands.DecompressArchiveHere.CanExecute(null) || Commands.DecompressArchiveHereSmart.CanExecute(null) || Commands.DecompressArchiveToChildFolder.CanExecute(null);
 
+		public int GridViewItemWidth
+		{
+			get => _InstanceViewModel?.FolderSettings.GridViewItemWidth ?? UserSettingsService.LayoutSettingsService.GridViewItemWidth;
+			set
+			{
+				if (_InstanceViewModel is not null)
+					_InstanceViewModel.FolderSettings.GridViewItemWidth = value;
+			}
+		}
+
 		public bool IsCardsLayout => _InstanceViewModel?.FolderSettings.LayoutMode is FolderLayoutModes.CardsView;
 		public bool IsColumnLayout => _InstanceViewModel?.FolderSettings.LayoutMode is FolderLayoutModes.ColumnView;
 		public bool IsGridLayout => _InstanceViewModel?.FolderSettings.LayoutMode is FolderLayoutModes.GridView;
@@ -124,28 +134,28 @@ namespace Files.App.ViewModels.UserControls
 			(IsListLayout && UserSettingsService.LayoutSettingsService.ListViewSize == ListViewSizeKind.Small) ||
 			(IsColumnLayout && UserSettingsService.LayoutSettingsService.ColumnsViewSize == ColumnsViewSizeKind.Small) ||
 			(IsCardsLayout && UserSettingsService.LayoutSettingsService.CardsViewSize == CardsViewSizeKind.Small) ||
-			(IsGridLayout && UserSettingsService.LayoutSettingsService.GridViewItemWidth == LayoutSizeKindHelper.GetGridViewItemWidth(GridViewSizeKind.Small));
+			(IsGridLayout && GridViewItemWidth == LayoutSizeKindHelper.GetGridViewItemWidth(GridViewSizeKind.Small));
 
 		public bool IsLayoutSizeMedium =>
 			(IsDetailsLayout && UserSettingsService.LayoutSettingsService.DetailsViewSize == DetailsViewSizeKind.Medium) ||
 			(IsListLayout && UserSettingsService.LayoutSettingsService.ListViewSize == ListViewSizeKind.Medium) ||
 			(IsColumnLayout && UserSettingsService.LayoutSettingsService.ColumnsViewSize == ColumnsViewSizeKind.Medium) ||
 			(IsCardsLayout && UserSettingsService.LayoutSettingsService.CardsViewSize == CardsViewSizeKind.Medium) ||
-			(IsGridLayout && UserSettingsService.LayoutSettingsService.GridViewItemWidth == LayoutSizeKindHelper.GetGridViewItemWidth(GridViewSizeKind.Medium));
+			(IsGridLayout && GridViewItemWidth == LayoutSizeKindHelper.GetGridViewItemWidth(GridViewSizeKind.Medium));
 
 		public bool IsLayoutSizeLarge =>
 			(IsDetailsLayout && UserSettingsService.LayoutSettingsService.DetailsViewSize == DetailsViewSizeKind.Large) ||
 			(IsListLayout && UserSettingsService.LayoutSettingsService.ListViewSize == ListViewSizeKind.Large) ||
 			(IsColumnLayout && UserSettingsService.LayoutSettingsService.ColumnsViewSize == ColumnsViewSizeKind.Large) ||
 			(IsCardsLayout && UserSettingsService.LayoutSettingsService.CardsViewSize == CardsViewSizeKind.Large) ||
-			(IsGridLayout && UserSettingsService.LayoutSettingsService.GridViewItemWidth == LayoutSizeKindHelper.GetGridViewItemWidth(GridViewSizeKind.Large));
+			(IsGridLayout && GridViewItemWidth == LayoutSizeKindHelper.GetGridViewItemWidth(GridViewSizeKind.Large));
 
 		public bool IsLayoutSizeExtraLarge =>
 			(IsDetailsLayout && UserSettingsService.LayoutSettingsService.DetailsViewSize == DetailsViewSizeKind.ExtraLarge) ||
 			(IsListLayout && UserSettingsService.LayoutSettingsService.ListViewSize == ListViewSizeKind.ExtraLarge) ||
 			(IsColumnLayout && UserSettingsService.LayoutSettingsService.ColumnsViewSize == ColumnsViewSizeKind.ExtraLarge) ||
 			(IsCardsLayout && UserSettingsService.LayoutSettingsService.CardsViewSize == CardsViewSizeKind.ExtraLarge) ||
-			(IsGridLayout && UserSettingsService.LayoutSettingsService.GridViewItemWidth == LayoutSizeKindHelper.GetGridViewItemWidth(GridViewSizeKind.ExtraLarge));
+			(IsGridLayout && GridViewItemWidth == LayoutSizeKindHelper.GetGridViewItemWidth(GridViewSizeKind.ExtraLarge));
 
 		private bool _IsDynamicOverflowEnabled;
 		public bool IsDynamicOverflowEnabled { get => _IsDynamicOverflowEnabled; set => SetProperty(ref _IsDynamicOverflowEnabled, value); }
@@ -268,6 +278,7 @@ namespace Files.App.ViewModels.UserControls
 					value.FolderSettings.PropertyChanged += FolderSettings_PropertyChanged;
 					value.PropertyChanged += InstanceViewModel_PropertyChanged;
 					OnPropertyChanged(nameof(OmnibarSearchModePlaceholder));
+					OnPropertyChanged(nameof(GridViewItemWidth));
 					OnPropertyChanged(nameof(IsNaturalLanguageSearchAvailable));
 				}
 			}
@@ -1349,6 +1360,14 @@ namespace Files.App.ViewModels.UserControls
 
 		private void FolderSettings_PropertyChanged(object? sender, PropertyChangedEventArgs e)
 		{
+			if (e.PropertyName == nameof(LayoutPreferencesManager.GridViewItemWidth))
+			{
+				OnPropertyChanged(nameof(GridViewItemWidth));
+				OnPropertyChanged(nameof(IsLayoutSizeSmall));
+				OnPropertyChanged(nameof(IsLayoutSizeMedium));
+				OnPropertyChanged(nameof(IsLayoutSizeLarge));
+				OnPropertyChanged(nameof(IsLayoutSizeExtraLarge));
+			}
 			switch (e.PropertyName)
 			{
 				case nameof(LayoutPreferencesManager.LayoutMode):

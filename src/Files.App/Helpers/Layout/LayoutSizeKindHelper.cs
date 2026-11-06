@@ -16,7 +16,7 @@ namespace Files.App.Helpers
 		/// </summary>
 		/// <param name="folderLayoutMode"></param>
 		/// <returns></returns>
-		public static uint GetIconSize(FolderLayoutModes folderLayoutMode)
+		public static uint GetIconSize(FolderLayoutModes folderLayoutMode, int? gridViewItemWidth = null)
 		{
 			return folderLayoutMode switch
 			{
@@ -49,7 +49,7 @@ namespace Files.App.Helpers
 
 				// Grid
 				// Share image resolutions across nearby sizes to avoid reloading thumbnails on every zoom step.
-				FolderLayoutModes.GridView => (uint)(Math.Ceiling(LayoutSettingsService.GridViewItemWidth / 128d) * 128),
+				FolderLayoutModes.GridView => (uint)(Math.Ceiling((gridViewItemWidth ?? LayoutSettingsService.GridViewItemWidth) / 128d) * 128),
 
 				_ => 256,
 			};

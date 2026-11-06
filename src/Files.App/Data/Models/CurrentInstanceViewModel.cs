@@ -13,6 +13,8 @@ namespace Files.App.Data.Models
 
 		public LayoutPreferencesManager FolderSettings { get; }
 
+		internal Dictionary<string, (double Horizontal, double Vertical)> FolderScrollPositions { get; } = new(StringComparer.OrdinalIgnoreCase);
+
 		public CurrentInstanceViewModel()
 		{
 			FolderSettings = new LayoutPreferencesManager();
