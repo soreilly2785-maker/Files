@@ -75,7 +75,7 @@ namespace Files.App.Views
 				presenter.SetBorderAndTitleBar(false, false);
 				presenter.IsResizable = true;
 			}
-			AppWindow.Resize(new(800, 600));
+			AppWindow.ResizeClient(new(800, 600));
 			canvas.Background = new SolidColorBrush(Microsoft.UI.Colors.Black);
 			status.Foreground = new SolidColorBrush(Microsoft.UI.Colors.White);
 			image.RenderTransform = transform;
@@ -277,10 +277,13 @@ namespace Files.App.Views
 				{
 					initialSize = false;
 					var area = DisplayArea.GetFromWindowId(AppWindow.Id, DisplayAreaFallback.Primary).WorkArea;
-					var fit = Math.Min(1, Math.Min(area.Width * 0.9 / pixelWidth, area.Height * 0.9 / pixelHeight));
+					var frameWidth = AppWindow.Size.Width - AppWindow.ClientSize.Width;
+					var frameHeight = AppWindow.Size.Height - AppWindow.ClientSize.Height;
+					var fit = Math.Min(1, Math.Min((double)(area.Width - frameWidth) / pixelWidth, (double)(area.Height - frameHeight) / pixelHeight));
 					var width = Math.Max(150, (int)(pixelWidth * fit));
 					var height = Math.Max(112, (int)(pixelHeight * fit));
-					AppWindow.MoveAndResize(new RectInt32(area.X + (area.Width - width) / 2, area.Y + (area.Height - height) / 2, width, height));
+					AppWindow.ResizeClient(new(width, height));
+					AppWindow.Move(new(area.X + (area.Width - AppWindow.Size.Width) / 2, area.Y + (area.Height - AppWindow.Size.Height) / 2));
 				}
 				FitImage();
 				var scale = DesiredScale();

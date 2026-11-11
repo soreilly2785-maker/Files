@@ -31,7 +31,7 @@ jobs:
       - name: Prepare development package and signing certificate
         run: |
           [xml]$manifest = Get-Content src/Files.App/Package.appxmanifest
-          $manifest.Package.Identity.Version = '4.3.1.4'
+          $manifest.Package.Identity.Version = '4.3.1.5'
           $manifest.Package.Properties.DisplayName = 'Files'
           $manifest.Package.Applications.Application.VisualElements.DisplayName = 'Files'
           $manifest.Package.Applications.Application.VisualElements.DefaultTile.ShortName = 'Files'
