@@ -4755,4 +4755,25 @@
   <data name="SearchForQuery" xml:space="preserve">
     <value>Search for `{0}`</value>
   </data>
+  <data name="PhotoViewerPrevious" xml:space="preserve">
+    <value>Previous photo</value>
+  </data>
+  <data name="PhotoViewerNext" xml:space="preserve">
+    <value>Next photo</value>
+  </data>
+  <data name="PhotoViewerSaveAs" xml:space="preserve">
+    <value>Save As</value>
+  </data>
+  <data name="PhotoViewerFlipHorizontal" xml:space="preserve">
+    <value>Flip Horizontal</value>
+  </data>
+  <data name="PhotoViewerFlipVertical" xml:space="preserve">
+    <value>Flip Vertical</value>
+  </data>
+  <data name="PhotoViewerLoadError" xml:space="preserve">
+    <value>This photo could not be opened. Try Open with from the right-click menu.</value>
+  </data>
+  <data name="PhotoViewerExportError" xml:space="preserve">
+    <value>The photo could not be copied or saved.</value>
+  </data>
 </root>

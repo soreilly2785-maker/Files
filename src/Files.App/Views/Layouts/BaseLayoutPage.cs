@@ -432,6 +432,12 @@ namespace Files.App.Views.Layouts
 			return items ?? new List<ListedItem>();
 		}
 
+		public IReadOnlyList<string> GetPhotoViewerPaths() => GetAllItems()
+			.Where(item => item.PrimaryItemAttribute == StorageItemTypes.File && !item.IsShortcut)
+			.Select(item => item.GetRequiredPath())
+			.Where(PhotoViewerWindow.CanOpen)
+			.ToArray();
+
 		public virtual void ResetItemOpacity()
 		{
 			var items = GetAllItems();

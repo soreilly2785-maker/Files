@@ -713,6 +713,12 @@ namespace Files.App.Helpers
 			bool isHiddenItem = Win32Helper.HasFileAttribute(path, System.IO.FileAttributes.Hidden);
 			bool isShortcut = FileExtensionHelpers.IsShortcutOrUrlFile(path) || !string.IsNullOrEmpty(shortcutInfo.TargetPath);
 
+			if (!openViaApplicationPicker && string.IsNullOrEmpty(args) && !isShortcut && PhotoViewerWindow.CanOpen(path))
+			{
+				PhotoViewerWindow.Open(path, (associatedInstance.SlimContentPage as BaseLayoutPage)?.GetPhotoViewerPaths() ?? [path]);
+				return (FilesystemResult)true;
+			}
+
 			if (isShortcut)
 			{
 				// Empty or non-rooted shell target (e.g. a shell:appsfolder app): launch the .lnk so the shell activates it

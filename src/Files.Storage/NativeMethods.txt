@@ -25,6 +25,8 @@ GetSystemMetricsForDpi
 DefWindowProc
 SYSTEM_METRICS_INDEX
 GetDpiForWindow
+GetWindowRect
+ReleaseCapture
 HWND
 LRESULT
 WPARAM
