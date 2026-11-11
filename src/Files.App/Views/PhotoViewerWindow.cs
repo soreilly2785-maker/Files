@@ -1,6 +1,7 @@
 // Copyright (c) Files Community
 // SPDX-License-Identifier: MPL-2.0
 
+using Files.Shared.Helpers;
 using Microsoft.UI.Windowing;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
@@ -36,6 +37,7 @@ namespace Files.App.Views
 		private readonly Button previous;
 		private readonly Button next;
 		private CancellationTokenSource? loadCancellation;
+		private SoftwareBitmapSource? displayedSource;
 		private int index;
 		private int rotation;
 		private bool flipped;
@@ -85,7 +87,7 @@ namespace Files.App.Views
 			canvas.Children.Add(next);
 			host.Content = canvas;
 			Content = host;
-			host.KeyDown += OnKeyDown;
+			host.AddHandler(UIElement.KeyDownEvent, new KeyEventHandler(OnKeyDown), true);
 			canvas.PointerPressed += OnPointerPressed;
 			canvas.PointerEntered += (_, _) => { previous.Opacity = next.Opacity = 1; };
 			canvas.PointerExited += (_, _) => { previous.Opacity = next.Opacity = 0; };
@@ -100,7 +102,7 @@ namespace Files.App.Views
 				closed = true;
 				loadCancellation?.Cancel();
 				resizeTimer.Stop();
-				image.Source = null;
+				ClearImage();
 				Dispose();
 			};
 		}
@@ -126,7 +128,7 @@ namespace Files.App.Views
 			Add(Strings.Copy.GetLocalizedResource(), () => _ = ExportAsync(false));
 			Add(Strings.PhotoViewerSaveAs.GetLocalizedResource(), () => _ = ExportAsync(true));
 			menu.Items.Add(new MenuFlyoutSeparator());
-			Add(Strings.RotateRight.GetLocalizedResource(), () => { rotation = (rotation + 1) % 4; FitImage(); });
+			Add(Strings.RotateRight.GetLocalizedResource(), () => { rotation = (rotation + 1) % 4; FitImage(); resizeTimer.Start(); });
 			Add(Strings.PhotoViewerFlipHorizontal.GetLocalizedResource(), () => Flip(false));
 			Add(Strings.PhotoViewerFlipVertical.GetLocalizedResource(), () => Flip(true));
 			menu.Items.Add(new MenuFlyoutSeparator());
@@ -175,8 +177,14 @@ namespace Files.App.Views
 				Navigate(properties.IsXButton1Pressed ? -1 : 1);
 				e.Handled = true;
 			}
-			else if (properties.IsLeftButtonPressed && e.OriginalSource is not Button && e.OriginalSource is not SymbolIcon)
+			else if (properties.IsLeftButtonPressed)
 			{
+				for (var element = e.OriginalSource as DependencyObject; element is not null; element = VisualTreeHelper.GetParent(element))
+				{
+					if (element is Button)
+						return;
+				}
+				host.Focus(FocusState.Pointer);
 				PInvoke.ReleaseCapture();
 				PInvoke.SendMessage(new(WindowHandle), 0x00A1, new WPARAM(2), default);
 			}
@@ -237,11 +245,18 @@ namespace Files.App.Views
 			loadCancellation = cancellation;
 			if (clear)
 			{
-				image.Source = null;
+				ClearImage();
 				decodedScale = 0;
 				status.Text = string.Empty;
 			}
 			_ = LoadAsync(paths[index], cancellation);
+		}
+
+		private void ClearImage()
+		{
+			image.Source = null;
+			displayedSource?.Dispose();
+			displayedSource = null;
 		}
 
 		private async Task LoadAsync(string path, CancellationTokenSource cancellation)
@@ -277,9 +292,20 @@ namespace Files.App.Views
 				};
 				using var bitmap = await decoder.GetSoftwareBitmapAsync(BitmapPixelFormat.Bgra8, BitmapAlphaMode.Premultiplied, bitmapTransform, ExifOrientationMode.RespectExifOrientation, ColorManagementMode.ColorManageToSRgb).AsTask(token);
 				var source = new SoftwareBitmapSource();
-				await source.SetBitmapAsync(bitmap).AsTask(token);
-				token.ThrowIfCancellationRequested();
+				try
+				{
+					await source.SetBitmapAsync(bitmap);
+					token.ThrowIfCancellationRequested();
+				}
+				catch
+				{
+					source.Dispose();
+					throw;
+				}
+				var oldSource = displayedSource;
 				image.Source = source;
+				displayedSource = source;
+				oldSource?.Dispose();
 				decodedScale = scale;
 				Title = Path.GetFileName(path);
 				status.Text = string.Empty;
