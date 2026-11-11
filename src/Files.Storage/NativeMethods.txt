@@ -97,6 +97,7 @@ SHCNRF_SOURCE
 SHCNE_ID
 SHCreateStreamOnFileEx
 DwmSetWindowAttribute
+DwmExtendFrameIntoClientArea
 WIN32_ERROR
 CoCreateInstance
 FileOpenDialog

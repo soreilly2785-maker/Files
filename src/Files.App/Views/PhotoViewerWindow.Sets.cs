@@ -17,21 +17,23 @@ namespace Files.App.Views
 		private byte[]? previewBytes;
 		private string? previewPath;
 
-		private async Task StoreSetPreviewAsync(SoftwareBitmap sample, string path, CancellationToken token)
+		private static async Task<byte[]> EncodeSetPreviewAsync(SoftwareBitmap sample, CancellationToken token)
 		{
-			if (StringComparer.OrdinalIgnoreCase.Equals(previewPath, path)) return;
 			using var stream = new InMemoryRandomAccessStream();
 			var encoder = await BitmapEncoder.CreateAsync(BitmapEncoder.PngEncoderId, stream);
 			token.ThrowIfCancellationRequested();
 			encoder.SetSoftwareBitmap(sample);
+			var scale = Math.Min(1, 128d / Math.Max(sample.PixelWidth, sample.PixelHeight));
+			encoder.BitmapTransform.ScaledWidth = Math.Max(1, (uint)(sample.PixelWidth * scale));
+			encoder.BitmapTransform.ScaledHeight = Math.Max(1, (uint)(sample.PixelHeight * scale));
+			encoder.BitmapTransform.InterpolationMode = BitmapInterpolationMode.Fant;
 			await encoder.FlushAsync();
 			token.ThrowIfCancellationRequested();
 			stream.Seek(0);
 			var bytes = new byte[(int)stream.Size];
 			await stream.ReadAsync(bytes.AsBuffer(), (uint)bytes.Length, InputStreamOptions.None);
 			token.ThrowIfCancellationRequested();
-			previewBytes = bytes;
-			previewPath = path;
+			return bytes;
 		}
 
 		private void ShowWindowSets()

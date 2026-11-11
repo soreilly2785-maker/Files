@@ -33,7 +33,7 @@ namespace Files.App.Views
 	{
 		private readonly string[] paths;
 		private readonly Grid canvas = new();
-		private readonly UserControl host = new() { IsTabStop = true };
+		private readonly UserControl host = new() { IsTabStop = true, UseSystemFocusVisuals = false };
 		private readonly Image image = new() { Stretch = Stretch.Fill, RenderTransformOrigin = new(0.5, 0.5) };
 		private readonly TextBlock status = new() { HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center, TextWrapping = TextWrapping.Wrap, Margin = new(24) };
 		private readonly CompositeTransform transform = new();
@@ -43,7 +43,6 @@ namespace Files.App.Views
 		private readonly Button next;
 		private readonly StackPanel windowControls = new() { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right, VerticalAlignment = VerticalAlignment.Top, Margin = new(8), Opacity = 0 };
 		private CancellationTokenSource? loadCancellation;
-		private SoftwareBitmapSource? displayedSource;
 		private int index;
 		private int rotation;
 		private bool flipped;
@@ -109,17 +108,20 @@ namespace Files.App.Views
 			host.AddHandler(UIElement.KeyDownEvent, new KeyEventHandler(OnKeyDown), true);
 			InitializeImageInteraction();
 			canvas.PointerPressed += OnPointerPressed;
-			canvas.PointerEntered += (_, _) => { previous.Opacity = next.Opacity = 1; };
 			canvas.PointerMoved += (_, e) =>
 			{
 				var point = e.GetCurrentPoint(canvas).Position;
+				UpdateNavigationHover(point);
 				windowControls.Opacity = point.Y <= 56 && point.X >= canvas.ActualWidth - windowControls.ActualWidth - 16 ? 1 : 0;
 			};
 			canvas.PointerExited += (_, e) =>
 			{
 				var point = e.GetCurrentPoint(canvas).Position;
 				if (point.X < 0 || point.Y < 0 || point.X >= canvas.ActualWidth || point.Y >= canvas.ActualHeight)
-					previous.Opacity = next.Opacity = windowControls.Opacity = 0;
+				{
+					HideNavigation();
+					windowControls.Opacity = 0;
+				}
 				else if (point.Y > 56 || point.X < canvas.ActualWidth - windowControls.ActualWidth - 16)
 					windowControls.Opacity = 0;
 			};
@@ -129,12 +131,16 @@ namespace Files.App.Views
 			openingFocusTimer.Interval = TimeSpan.FromMilliseconds(200);
 			openingFocusTimer.IsRepeating = false;
 			openingFocusTimer.Tick += (_, _) => BringOpeningToFront();
+			navigationHoverTimer = DispatcherQueue.CreateTimer();
+			navigationHoverTimer.Interval = TimeSpan.FromMilliseconds(900);
+			navigationHoverTimer.IsRepeating = false;
+			navigationHoverTimer.Tick += (_, _) => HideNavigation();
 			resizeTimer.Interval = TimeSpan.FromMilliseconds(180);
 			resizeTimer.IsRepeating = false;
 			resizeTimer.Tick += (_, _) =>
 			{
 				var desired = DesiredScale();
-				if (!closed && (desired > decodedScale * 1.1 || desired < decodedScale * 0.7)) StartLoad(false);
+				if (!closed && HasCurrentPhoto && (desired > decodedScale * 1.1 || desired < decodedScale * 0.7)) StartLoad(false);
 			};
 			canvas.SizeChanged += (_, _) => { UpdateViewport(); FitImage(); resizeTimer.Stop(); resizeTimer.Start(); UpdateDragRegions(); };
 			windowControls.SizeChanged += (_, _) => UpdateDragRegions();
@@ -145,7 +151,11 @@ namespace Files.App.Views
 				loadCancellation?.Cancel();
 				resizeTimer.Stop();
 				openingFocusTimer.Stop();
+				navigationHoverTimer.Stop();
+				cacheLifetime.Cancel();
 				ClearImage();
+				foreach (var photo in photoCache.Values) photo.Dispose();
+				photoCache.Clear();
 				openWindows.Remove(this);
 				RemoveFromWindowSets(this);
 				if (lastActiveWindow == this) lastActiveWindow = openWindows.LastOrDefault();
@@ -170,8 +180,16 @@ namespace Files.App.Views
 		{
 			uint noBorder = 0xfffffffe;
 			PInvoke.DwmSetWindowAttribute(new(WindowHandle), DWMWINDOWATTRIBUTE.DWMWA_BORDER_COLOR, &noBorder, sizeof(uint));
+			RemoveExtendedFrame();
 			PInvoke.SetWindowPos(new(WindowHandle), default, 0, 0, 0, 0,
 				SET_WINDOW_POS_FLAGS.SWP_NOMOVE | SET_WINDOW_POS_FLAGS.SWP_NOSIZE | SET_WINDOW_POS_FLAGS.SWP_NOZORDER | SET_WINDOW_POS_FLAGS.SWP_NOACTIVATE | SET_WINDOW_POS_FLAGS.SWP_FRAMECHANGED);
+		}
+
+		private void RemoveExtendedFrame()
+		{
+			PInvoke.DwmExtendFrameIntoClientArea(new(WindowHandle), new Windows.Win32.UI.Controls.MARGINS());
+			AppWindow.TitleBar.BackgroundColor = Microsoft.UI.Colors.Transparent;
+			AppWindow.TitleBar.InactiveBackgroundColor = Microsoft.UI.Colors.Transparent;
 		}
 
 		private void UpdateDragRegions()
@@ -184,18 +202,26 @@ namespace Files.App.Views
 				if (closed || canvas.XamlRoot is not { } root) return;
 				var scale = root.RasterizationScale;
 				var width = AppWindow.ClientSize.Width;
+				var frameHeight = AppWindow.ClientSize.Height;
+				if (width <= 0 || frameHeight <= 0) return;
 				var edge = (int)Math.Ceiling(6 * scale);
 				var height = (int)Math.Ceiling(40 * scale);
 				var controlsWidth = (int)Math.Ceiling((windowControls.ActualWidth + 16) * scale);
 				var source = InputNonClientPointerSource.GetForWindowId(AppWindow.Id);
+				RemoveExtendedFrame();
+				source.SetRegionRects(NonClientRegionKind.LeftBorder, [new(0, 0, edge, frameHeight)]);
+				source.SetRegionRects(NonClientRegionKind.RightBorder, [new(Math.Max(0, width - edge), 0, edge, frameHeight)]);
+				source.SetRegionRects(NonClientRegionKind.TopBorder, [new(0, 0, width, edge)]);
+				source.SetRegionRects(NonClientRegionKind.BottomBorder, [new(0, Math.Max(0, frameHeight - edge), width, edge)]);
 				source.SetRegionRects(NonClientRegionKind.Caption, [new(edge, edge, Math.Max(1, width - edge * 2), Math.Max(1, height - edge))]);
-				source.SetRegionRects(NonClientRegionKind.Passthrough, [new(Math.Max(edge, width - controlsWidth), edge, Math.Min(controlsWidth, Math.Max(1, width - edge * 2)), height)]);
+				var controlsLeft = Math.Max(edge, width - controlsWidth);
+				source.SetRegionRects(NonClientRegionKind.Passthrough, [new(controlsLeft, edge, Math.Max(1, width - edge - controlsLeft), Math.Max(1, height - edge))]);
 			})) dragRegionUpdatePending = false;
 		}
 
 		private Button NavigationButton(Symbol symbol, string label, HorizontalAlignment alignment, int direction)
 		{
-			var button = new Button { Content = new SymbolIcon(symbol), HorizontalAlignment = alignment, VerticalAlignment = VerticalAlignment.Center, Margin = new(12), Opacity = 0 };
+			var button = new Button { Content = new SymbolIcon(symbol), HorizontalAlignment = alignment, VerticalAlignment = VerticalAlignment.Center, Margin = new(12), Opacity = 0, IsHitTestVisible = false };
 			ToolTipService.SetToolTip(button, label);
 			Microsoft.UI.Xaml.Automation.AutomationProperties.SetName(button, label);
 			button.Click += (_, _) => Navigate(direction);
@@ -248,11 +274,11 @@ namespace Files.App.Views
 			if (exporting || paths.Length < 2)
 				return;
 			index = (index + direction + paths.Length) % paths.Length;
+			TrimPhotoCache();
 			ResetView();
 			resizeTimer.Stop();
 			rotation = 0;
 			flipped = false;
-			pixelWidth = pixelHeight = 0;
 			StartLoad();
 		}
 
@@ -298,7 +324,7 @@ namespace Files.App.Views
 				result = default;
 				return true;
 			}
-			if (message == 0x0084 && PInvoke.GetWindowRect(new(WindowHandle), out var bounds))
+			if (message == 0x0084 && !PInvoke.IsZoomed(new(WindowHandle)) && PInvoke.GetWindowRect(new(WindowHandle), out var bounds))
 			{
 				var x = (short)((long)lParam.Value & 0xffff);
 				var y = (short)(((long)lParam.Value >> 16) & 0xffff);
@@ -354,8 +380,6 @@ namespace Files.App.Views
 			loadCancellation = cancellation;
 			if (clear)
 			{
-				ClearImage();
-				decodedScale = 0;
 				status.Text = string.Empty;
 			}
 			_ = LoadAsync(paths[index], cancellation);
@@ -364,86 +388,53 @@ namespace Files.App.Views
 		private void ClearImage()
 		{
 			image.Source = null;
-			displayedSource?.Dispose();
-			displayedSource = null;
+			if (displayedPhoto is { CacheQuality: false } photo) photo.Dispose();
+			displayedPhoto = null;
 		}
 
 		private async Task LoadAsync(string path, CancellationTokenSource cancellation)
 		{
 			var token = cancellation.Token;
 			var entered = false;
+			PreparedPhoto? prepared = null;
 			try
 			{
+				if (!HasCurrentPhoto)
+				{
+					if (!photoCache.ContainsKey(path) && pendingPhotos.TryGetValue(path, out var pending))
+						await pending.Task.WaitAsync(token);
+					token.ThrowIfCancellationRequested();
+					if (photoCache.TryGetValue(path, out var cached))
+					{
+						ShowPreparedPhoto(cached);
+						PrefetchNearbyPhotos();
+						if (DesiredScale() <= decodedScale * 1.1) return;
+					}
+				}
 				await decoderGate.WaitAsync(token);
 				entered = true;
-				var file = await StorageFile.GetFileFromPathAsync(path).AsTask(token);
-				using var stream = await file.OpenReadAsync().AsTask(token);
-				var decoder = await BitmapDecoder.CreateAsync(stream).AsTask(token);
+				prepared = await DecodePhotoAsync(path, !HasCurrentPhoto, token);
 				token.ThrowIfCancellationRequested();
-				pixelWidth = decoder.OrientedPixelWidth;
-				pixelHeight = decoder.OrientedPixelHeight;
-				if (initialSize)
+				ShowPreparedPhoto(prepared);
+				prepared = null;
+				PrefetchNearbyPhotos();
+				if (DesiredScale() > decodedScale * 1.1)
 				{
-					initialSize = false;
-					ResizeToNative();
-				}
-				FitImage();
-				var scale = DesiredScale();
-				var bitmapTransform = new BitmapTransform
-				{
-					ScaledWidth = Math.Max(1, (uint)(decoder.PixelWidth * scale)),
-					ScaledHeight = Math.Max(1, (uint)(decoder.PixelHeight * scale)),
-					InterpolationMode = BitmapInterpolationMode.Fant
-				};
-				using var bitmap = await decoder.GetSoftwareBitmapAsync(BitmapPixelFormat.Bgra8, BitmapAlphaMode.Premultiplied, bitmapTransform, ExifOrientationMode.RespectExifOrientation, ColorManagementMode.ColorManageToSRgb).AsTask(token);
-				var source = new SoftwareBitmapSource();
-				try
-				{
-					await source.SetBitmapAsync(bitmap);
+					prepared = await DecodePhotoAsync(path, false, token);
 					token.ThrowIfCancellationRequested();
+					ShowPreparedPhoto(prepared);
+					prepared = null;
 				}
-				catch
-				{
-					source.Dispose();
-					throw;
-				}
-				var oldSource = displayedSource;
-				image.Source = source;
-				displayedSource = source;
-				oldSource?.Dispose();
-				decodedScale = scale;
-				Title = Path.GetFileName(path);
-				status.Text = string.Empty;
-				if (openingImage)
-				{
-					openingImage = false;
-					BringOpeningToFront();
-					openingFocusTimer.Start();
-				}
-				var sampleScale = Math.Min(1, 128d / Math.Max(decoder.PixelWidth, decoder.PixelHeight));
-				bitmapTransform.ScaledWidth = Math.Max(1, (uint)(decoder.PixelWidth * sampleScale));
-				bitmapTransform.ScaledHeight = Math.Max(1, (uint)(decoder.PixelHeight * sampleScale));
-				using var sample = await decoder.GetSoftwareBitmapAsync(BitmapPixelFormat.Bgra8, BitmapAlphaMode.Premultiplied, bitmapTransform, ExifOrientationMode.RespectExifOrientation, ColorManagementMode.ColorManageToSRgb).AsTask(token);
-				var pixels = new byte[sample.PixelWidth * sample.PixelHeight * 4];
-				sample.CopyToBuffer(pixels.AsBuffer());
-				long red = 0, green = 0, blue = 0, alpha = 0;
-				for (var i = 0; i < pixels.Length; i += 4)
-				{
-					blue += pixels[i]; green += pixels[i + 1]; red += pixels[i + 2]; alpha += pixels[i + 3];
-				}
-				token.ThrowIfCancellationRequested();
-				canvas.Background = new SolidColorBrush(Windows.UI.Color.FromArgb(255, (byte)(red * 255 / Math.Max(1, alpha)), (byte)(green * 255 / Math.Max(1, alpha)), (byte)(blue * 255 / Math.Max(1, alpha))));
-				await StoreSetPreviewAsync(sample, path, token);
 			}
 			catch (OperationCanceledException) { }
 			catch (Exception ex)
 			{
-				if (!token.IsCancellationRequested && !closed)
-					status.Text = Strings.PhotoViewerLoadError.GetLocalizedResource();
+				if (!token.IsCancellationRequested && !closed) status.Text = Strings.PhotoViewerLoadError.GetLocalizedResource();
 				Debug.WriteLine(ex);
 			}
 			finally
 			{
+				prepared?.Dispose();
 				if (entered) decoderGate.Release();
 				if (ReferenceEquals(loadCancellation, cancellation)) loadCancellation = null;
 				cancellation.Dispose();
@@ -464,7 +455,7 @@ namespace Files.App.Views
 
 		private async Task ExportAsync(bool save, bool enlargeForScreen = false)
 		{
-			if (exporting || image.Source is null || closed)
+			if (exporting || !HasCurrentPhoto || closed)
 				return;
 			exporting = true;
 			var path = paths[index];

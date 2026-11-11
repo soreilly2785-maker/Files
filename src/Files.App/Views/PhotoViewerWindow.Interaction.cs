@@ -17,6 +17,7 @@ namespace Files.App.Views
 		private static int latestOpening;
 		private readonly int opening = ++latestOpening;
 		private readonly Microsoft.UI.Dispatching.DispatcherQueueTimer openingFocusTimer;
+		private readonly Microsoft.UI.Dispatching.DispatcherQueueTimer navigationHoverTimer;
 		private bool openingImage = true;
 		private double zoom = 1;
 		private double panX;
@@ -38,7 +39,7 @@ namespace Files.App.Views
 			};
 			image.PointerPressed += (_, e) =>
 			{
-				if (pixelWidth == 0 || !e.GetCurrentPoint(canvas).Properties.IsLeftButtonPressed || !image.CapturePointer(e.Pointer)) return;
+				if (!HasCurrentPhoto || !e.GetCurrentPoint(canvas).Properties.IsLeftButtonPressed || !image.CapturePointer(e.Pointer)) return;
 				panPointer = e.Pointer.PointerId;
 				panStart = e.GetCurrentPoint(canvas).Position;
 				panOrigin = new(panX, panY);
@@ -65,7 +66,7 @@ namespace Files.App.Views
 
 		private void OnPhotoWheelChanged(object sender, PointerRoutedEventArgs e)
 		{
-			if (pixelWidth == 0) return;
+			if (!HasCurrentPhoto) return;
 			var point = e.GetCurrentPoint(canvas);
 			if (point.Properties.IsHorizontalMouseWheel) return;
 			var nextZoom = Math.Clamp(zoom * Math.Pow(1.1, point.Properties.MouseWheelDelta / 120d), 0.1, 32);
@@ -93,6 +94,23 @@ namespace Files.App.Views
 		private void UpdateViewport()
 		{
 			canvas.Clip = new RectangleGeometry { Rect = new Rect(0, 0, canvas.ActualWidth, canvas.ActualHeight) };
+		}
+
+		private void UpdateNavigationHover(Point point)
+		{
+			var middle = Math.Abs(point.Y - canvas.ActualHeight / 2) <= 64;
+			previous.Opacity = middle && point.X <= 72 ? 1 : 0;
+			next.Opacity = middle && point.X >= canvas.ActualWidth - 72 ? 1 : 0;
+			previous.IsHitTestVisible = previous.Opacity != 0;
+			next.IsHitTestVisible = next.Opacity != 0;
+			navigationHoverTimer.Stop();
+			if (previous.IsHitTestVisible || next.IsHitTestVisible) navigationHoverTimer.Start();
+		}
+
+		private void HideNavigation()
+		{
+			previous.Opacity = next.Opacity = 0;
+			previous.IsHitTestVisible = next.IsHitTestVisible = false;
 		}
 
 		private void BringOpeningToFront()
