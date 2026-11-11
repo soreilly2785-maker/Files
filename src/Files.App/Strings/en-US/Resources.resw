@@ -4776,4 +4776,31 @@
   <data name="PhotoViewerExportError" xml:space="preserve">
     <value>The photo could not be copied or saved.</value>
   </data>
+  <data name="PhotoViewerMinimize" xml:space="preserve">
+    <value>Minimise</value>
+  </data>
+  <data name="PhotoViewerMaximizeRestore" xml:space="preserve">
+    <value>Maximise or restore</value>
+  </data>
+  <data name="PhotoViewerArrange" xml:space="preserve">
+    <value>Arrange photo windows</value>
+  </data>
+  <data name="PhotoViewerMaximizeAll" xml:space="preserve">
+    <value>Maximise all photo windows</value>
+  </data>
+  <data name="PhotoViewerRestoreAll" xml:space="preserve">
+    <value>Restore all photos to native size</value>
+  </data>
+  <data name="PhotoViewerTileAll" xml:space="preserve">
+    <value>Tile all photo windows</value>
+  </data>
+  <data name="PhotoViewerThreeColumns" xml:space="preserve">
+    <value>Arrange photos in batches of three columns</value>
+  </data>
+  <data name="PhotoViewerFourColumns" xml:space="preserve">
+    <value>Arrange photos in batches of four columns</value>
+  </data>
+  <data name="PhotoViewerFourGrid" xml:space="preserve">
+    <value>Arrange photos in batches of four (2 Ã— 2)</value>
+  </data>
 </root>

@@ -15,6 +15,7 @@ namespace Files.App.Services
 		// SaveAsync throws ArgumentException ("Maximum number of items exceeded") once the list grows past
 		// the shell's cap, so the recent group must stay bounded. The taskbar displays at most ~13 entries.
 		private const int MaxRecentItemsCount = 20;
+		private readonly SemaphoreSlim updateGate = new(1);
 
 		public async Task InitializeAsync()
 		{
@@ -24,6 +25,7 @@ namespace Files.App.Services
 				App.QuickAccessManager.UpdateQuickAccessWidget += UpdateQuickAccessWidget_Invoked;
 
 				await RefreshPinnedFoldersAsync();
+				await RefreshPhotoViewerTasksAsync();
 			}
 			catch (Exception ex)
 			{
@@ -33,6 +35,7 @@ namespace Files.App.Services
 
 		public async Task AddFolderAsync(string path)
 		{
+			await updateGate.WaitAsync();
 			try
 			{
 				if (JumpList.IsSupported())
@@ -54,6 +57,7 @@ namespace Files.App.Services
 			{
 				App.Logger.LogWarning(ex, ex.Message);
 			}
+			finally { updateGate.Release(); }
 		}
 
 		public async Task<IEnumerable<string>> GetFoldersAsync()
@@ -66,7 +70,7 @@ namespace Files.App.Services
 					// Disable automatic jumplist. It doesn't work.
 					instance.SystemGroupKind = JumpListSystemGroupKind.None;
 
-					return instance.Items.Select(item => item.Arguments).ToList();
+					return instance.Items.Where(item => !item.Arguments.StartsWith(PhotoViewerWindow.TaskArgumentPrefix, StringComparison.Ordinal)).Select(item => item.Arguments).ToList();
 				}
 				catch
 				{
@@ -81,6 +85,7 @@ namespace Files.App.Services
 
 		public async Task RefreshPinnedFoldersAsync()
 		{
+			await updateGate.WaitAsync();
 			try
 			{
 				if (App.QuickAccessManager.PinnedItemsWatcher is not null)
@@ -108,14 +113,46 @@ namespace Files.App.Services
 			{
 				if (App.QuickAccessManager.PinnedItemsWatcher is not null)
 					SafetyExtensions.IgnoreExceptions(() => App.QuickAccessManager.PinnedItemsWatcher.EnableRaisingEvents = true);
+				updateGate.Release();
 			}
+		}
+
+		public async Task RefreshPhotoViewerTasksAsync()
+		{
+			await updateGate.WaitAsync();
+			try
+			{
+				if (!JumpList.IsSupported()) return;
+				var instance = await JumpList.LoadCurrentAsync();
+				SyncPhotoViewerTasks(instance);
+				await instance.SaveAsync();
+			}
+			catch (Exception ex) { App.Logger.LogWarning(ex, ex.Message); }
+			finally { updateGate.Release(); }
+		}
+
+		private static void SyncPhotoViewerTasks(JumpList instance)
+		{
+			var prefix = $"{PhotoViewerWindow.TaskArgumentPrefix}{Environment.ProcessId}:";
+			var liveKeys = Microsoft.Windows.AppLifecycle.AppInstance.GetInstances().Select(instance => instance.Key).ToHashSet(StringComparer.Ordinal);
+			var stale = instance.Items.Where(item => item.Arguments.StartsWith(PhotoViewerWindow.TaskArgumentPrefix, StringComparison.Ordinal)).ToArray();
+			foreach (var item in stale)
+			{
+				if (PhotoViewerWindow.HasOpenWindows || item.Arguments.StartsWith(prefix, StringComparison.Ordinal) ||
+					PhotoViewerWindow.TryParseTaskArguments(item.Arguments, out var processId, out _) && !liveKeys.Contains($"Files.Window.{processId}"))
+					instance.Items.Remove(item);
+			}
+			if (!PhotoViewerWindow.HasOpenWindows) return;
+			foreach (var (command, label) in PhotoViewerWindow.GetArrangementCommands())
+				instance.Items.Add(JumpListItem.CreateWithArguments(prefix + command, label));
 		}
 
 		public async Task RemoveFolderAsync(string path)
 		{
-			if (JumpList.IsSupported())
+			await updateGate.WaitAsync();
+			try
 			{
-				try
+				if (JumpList.IsSupported())
 				{
 					var instance = await JumpList.LoadCurrentAsync();
 					// Disable automatic jumplist. It doesn't work.
@@ -125,8 +162,9 @@ namespace Files.App.Services
 					instance.Items.Remove(itemToRemove);
 					await instance.SaveAsync();
 				}
-				catch { }
 			}
+			catch { }
+			finally { updateGate.Release(); }
 		}
 
 		private void AddFolder(string path, string group, JumpList instance)

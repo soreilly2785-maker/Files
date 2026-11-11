@@ -101,6 +101,12 @@ namespace Files.App
 		[DynamicWindowsRuntimeCast(typeof(OverlappedPresenter))]
 		public async Task InitializeApplicationAsync(object? activatedEventArgs)
 		{
+			if (activatedEventArgs is ILaunchActivatedEventArgs photoArgs &&
+				PhotoViewerWindow.TryParseTaskArguments(photoArgs.Arguments, out var photoProcessId, out var photoCommand) && photoProcessId == Environment.ProcessId)
+			{
+				PhotoViewerWindow.Arrange(photoCommand);
+				return;
+			}
 			var rootFrame = EnsureWindowIsInitialized();
 
 			if (rootFrame is null)

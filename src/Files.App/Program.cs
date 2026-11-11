@@ -71,6 +71,13 @@ namespace Files.App
 				throw new InvalidOperationException(Constants.Startup.MissingRuntimeMessage, ex);
 			}
 
+			if (activatedArgs.Data is ILaunchActivatedEventArgs photoArgs &&
+				PhotoViewerWindow.TryParseTaskArguments(photoArgs.Arguments, out var photoProcessId, out _))
+			{
+				TryRedirectActivationToExistingInstance(activatedArgs, $"Files.Window.{photoProcessId}");
+				return;
+			}
+
 			var commandLineArgs = GetCommandLineArgs(activatedArgs);
 
 			if (commandLineArgs is not null)
@@ -199,12 +206,12 @@ namespace Files.App
 		/// <summary>
 		/// Attempts redirection, allowing a normal launch if the existing instance has exited.
 		/// </summary>
-		private static bool TryRedirectActivationToExistingInstance(AppActivationArguments args)
+		private static bool TryRedirectActivationToExistingInstance(AppActivationArguments args, string? targetKey = null)
 		{
 			try
 			{
 				var instance = AppInstance.GetInstances().FirstOrDefault(instance =>
-					!instance.IsCurrent && instance.Key.StartsWith("Files.Window.", StringComparison.Ordinal));
+					!instance.IsCurrent && (targetKey is null ? instance.Key.StartsWith("Files.Window.", StringComparison.Ordinal) : instance.Key == targetKey));
 				if (instance is null)
 					return false;
 

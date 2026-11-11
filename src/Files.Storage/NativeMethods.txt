@@ -26,7 +26,9 @@ DefWindowProc
 SYSTEM_METRICS_INDEX
 GetDpiForWindow
 GetWindowRect
-ReleaseCapture
+NCCALCSIZE_PARAMS
+IsZoomed
+MonitorFromWindow
 HWND
 LRESULT
 WPARAM

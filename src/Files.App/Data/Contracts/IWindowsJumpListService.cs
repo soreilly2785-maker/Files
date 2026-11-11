@@ -1,4 +1,4 @@
-﻿// Copyright (c) Files Community
+ï»¿// Copyright (c) Files Community
 // SPDX-License-Identifier: MPL-2.0
 
 namespace Files.App.Data.Contracts
@@ -10,6 +10,8 @@ namespace Files.App.Data.Contracts
 		Task AddFolderAsync(string path);
 
 		Task RefreshPinnedFoldersAsync();
+
+		Task RefreshPhotoViewerTasksAsync();
 
 		Task RemoveFolderAsync(string path);
 

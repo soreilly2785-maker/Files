@@ -8,6 +8,8 @@ using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Input;
 using Microsoft.UI.Xaml.Media;
 using Microsoft.UI.Xaml.Media.Imaging;
+using Microsoft.UI.Dispatching;
+using Microsoft.UI.Input;
 using System.IO;
 using System.Runtime.InteropServices.WindowsRuntime;
 using Windows.ApplicationModel.DataTransfer;
@@ -20,6 +22,9 @@ using Windows.Storage.Streams;
 using Windows.System;
 using Windows.Win32;
 using Windows.Win32.Foundation;
+using Windows.Win32.Graphics.Dwm;
+using Windows.Win32.Graphics.Gdi;
+using Windows.Win32.UI.WindowsAndMessaging;
 using WinRT;
 
 namespace Files.App.Views
@@ -36,6 +41,7 @@ namespace Files.App.Views
 		private readonly Microsoft.UI.Dispatching.DispatcherQueueTimer resizeTimer;
 		private readonly Button previous;
 		private readonly Button next;
+		private readonly StackPanel windowControls = new() { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right, VerticalAlignment = VerticalAlignment.Top, Margin = new(8), Opacity = 0 };
 		private CancellationTokenSource? loadCancellation;
 		private SoftwareBitmapSource? displayedSource;
 		private int index;
@@ -47,6 +53,7 @@ namespace Files.App.Views
 		private uint pixelHeight;
 		private double decodedScale;
 		private bool initialSize = true;
+		private bool dragRegionUpdatePending;
 
 		internal static bool CanOpen(string path) => Path.IsPathFullyQualified(path) && FileExtensionHelpers.IsImageFile(Path.GetExtension(path));
 
@@ -59,10 +66,15 @@ namespace Files.App.Views
 				paths = [path];
 				index = 0;
 			}
-			var window = new PhotoViewerWindow(paths, index);
-			window.Activate();
-			window.host.Focus(FocusState.Programmatic);
-			window.StartLoad();
+			// Finish Files' double-click focus handling before showing the viewer.
+			MainWindow.Instance.DispatcherQueue.TryEnqueue(DispatcherQueuePriority.Low, () =>
+			{
+				var window = new PhotoViewerWindow(paths, index);
+				window.Activate();
+				Win32Helper.BringToForegroundEx(new(window.WindowHandle));
+				window.host.Focus(FocusState.Programmatic);
+				window.StartLoad();
+			});
 		}
 
 		[DynamicWindowsRuntimeCast(typeof(OverlappedPresenter))]
@@ -70,11 +82,14 @@ namespace Files.App.Views
 		{
 			this.paths = paths;
 			this.index = index;
+			ExtendsContentIntoTitleBar = true;
 			if (AppWindow.Presenter is OverlappedPresenter presenter)
 			{
 				presenter.SetBorderAndTitleBar(false, false);
 				presenter.IsResizable = true;
 			}
+			RemoveFrame();
+			AppWindow.Move(MainWindow.Instance.AppWindow.Position);
 			AppWindow.ResizeClient(new(800, 600));
 			canvas.Background = new SolidColorBrush(Microsoft.UI.Colors.Black);
 			status.Foreground = new SolidColorBrush(Microsoft.UI.Colors.White);
@@ -85,26 +100,90 @@ namespace Files.App.Views
 			next = NavigationButton(Symbol.Forward, Strings.PhotoViewerNext.GetLocalizedResource(), HorizontalAlignment.Right, 1);
 			canvas.Children.Add(previous);
 			canvas.Children.Add(next);
+			AddWindowControl(Symbol.Remove, Strings.PhotoViewerMinimize.GetLocalizedResource(), Minimize);
+			AddWindowControl(Symbol.FullScreen, Strings.PhotoViewerMaximizeRestore.GetLocalizedResource(), ToggleMaximize);
+			AddWindowControl(Symbol.Cancel, Strings.Close.GetLocalizedResource(), Close);
+			canvas.Children.Add(windowControls);
 			host.Content = canvas;
 			Content = host;
 			host.AddHandler(UIElement.KeyDownEvent, new KeyEventHandler(OnKeyDown), true);
 			canvas.PointerPressed += OnPointerPressed;
 			canvas.PointerEntered += (_, _) => { previous.Opacity = next.Opacity = 1; };
-			canvas.PointerExited += (_, _) => { previous.Opacity = next.Opacity = 0; };
+			canvas.PointerMoved += (_, e) =>
+			{
+				var point = e.GetCurrentPoint(canvas).Position;
+				windowControls.Opacity = point.Y <= 56 && point.X >= canvas.ActualWidth - windowControls.ActualWidth - 16 ? 1 : 0;
+			};
+			canvas.PointerExited += (_, e) =>
+			{
+				var point = e.GetCurrentPoint(canvas).Position;
+				if (point.X < 0 || point.Y < 0 || point.X >= canvas.ActualWidth || point.Y >= canvas.ActualHeight)
+					previous.Opacity = next.Opacity = windowControls.Opacity = 0;
+				else if (point.Y > 56 || point.X < canvas.ActualWidth - windowControls.ActualWidth - 16)
+					windowControls.Opacity = 0;
+			};
 			canvas.ContextFlyout = CreateMenu();
 			resizeTimer = DispatcherQueue.CreateTimer();
 			resizeTimer.Interval = TimeSpan.FromMilliseconds(180);
 			resizeTimer.IsRepeating = false;
-			resizeTimer.Tick += (_, _) => { if (!closed && DesiredScale() > decodedScale * 1.1) StartLoad(false); };
-			canvas.SizeChanged += (_, _) => { FitImage(); resizeTimer.Stop(); resizeTimer.Start(); };
+			resizeTimer.Tick += (_, _) =>
+			{
+				var desired = DesiredScale();
+				if (!closed && (desired > decodedScale * 1.1 || desired < decodedScale * 0.7)) StartLoad(false);
+			};
+			canvas.SizeChanged += (_, _) => { FitImage(); resizeTimer.Stop(); resizeTimer.Start(); UpdateDragRegions(); };
+			windowControls.SizeChanged += (_, _) => UpdateDragRegions();
+			host.Loaded += (_, _) => UpdateDragRegions();
 			Closed += (_, _) =>
 			{
 				closed = true;
 				loadCancellation?.Cancel();
 				resizeTimer.Stop();
 				ClearImage();
+				openWindows.Remove(this);
+				if (lastActiveWindow == this) lastActiveWindow = openWindows.LastOrDefault();
+				DispatcherQueue.TryEnqueue(DispatcherQueuePriority.Low, () => _ = Ioc.Default.GetRequiredService<IWindowsJumpListService>().RefreshPhotoViewerTasksAsync());
 				Dispose();
 			};
+			openWindows.Add(this);
+			Activated += (_, e) => { if (e.WindowActivationState != WindowActivationState.Deactivated) lastActiveWindow = this; };
+			_ = Ioc.Default.GetRequiredService<IWindowsJumpListService>().RefreshPhotoViewerTasksAsync();
+		}
+
+		private void AddWindowControl(Symbol symbol, string label, Action action)
+		{
+			var button = new Button { Content = new SymbolIcon(symbol) };
+			ToolTipService.SetToolTip(button, label);
+			Microsoft.UI.Xaml.Automation.AutomationProperties.SetName(button, label);
+			button.Click += (_, _) => action();
+			windowControls.Children.Add(button);
+		}
+
+		private unsafe void RemoveFrame()
+		{
+			uint noBorder = 0xfffffffe;
+			PInvoke.DwmSetWindowAttribute(new(WindowHandle), DWMWINDOWATTRIBUTE.DWMWA_BORDER_COLOR, &noBorder, sizeof(uint));
+			PInvoke.SetWindowPos(new(WindowHandle), default, 0, 0, 0, 0,
+				SET_WINDOW_POS_FLAGS.SWP_NOMOVE | SET_WINDOW_POS_FLAGS.SWP_NOSIZE | SET_WINDOW_POS_FLAGS.SWP_NOZORDER | SET_WINDOW_POS_FLAGS.SWP_NOACTIVATE | SET_WINDOW_POS_FLAGS.SWP_FRAMECHANGED);
+		}
+
+		private void UpdateDragRegions()
+		{
+			if (dragRegionUpdatePending || closed) return;
+			dragRegionUpdatePending = true;
+			if (!DispatcherQueue.TryEnqueue(DispatcherQueuePriority.Low, () =>
+			{
+				dragRegionUpdatePending = false;
+				if (closed || canvas.XamlRoot is not { } root) return;
+				var scale = root.RasterizationScale;
+				var width = AppWindow.ClientSize.Width;
+				var edge = (int)Math.Ceiling(6 * scale);
+				var height = (int)Math.Ceiling(40 * scale);
+				var controlsWidth = (int)Math.Ceiling((windowControls.ActualWidth + 16) * scale);
+				var source = InputNonClientPointerSource.GetForWindowId(AppWindow.Id);
+				source.SetRegionRects(NonClientRegionKind.Caption, [new(edge, edge, Math.Max(1, width - edge * 2), Math.Max(1, height - edge))]);
+				source.SetRegionRects(NonClientRegionKind.Passthrough, [new(Math.Max(edge, width - controlsWidth), edge, Math.Min(controlsWidth, Math.Max(1, width - edge * 2)), height)]);
+			})) dragRegionUpdatePending = false;
 		}
 
 		private Button NavigationButton(Symbol symbol, string label, HorizontalAlignment alignment, int direction)
@@ -133,6 +212,14 @@ namespace Files.App.Views
 			Add(Strings.PhotoViewerFlipVertical.GetLocalizedResource(), () => Flip(true));
 			menu.Items.Add(new MenuFlyoutSeparator());
 			Add(Strings.OpenWith.GetLocalizedResource(), () => _ = OpenWithAsync());
+			var arrange = new MenuFlyoutSubItem { Text = Strings.PhotoViewerArrange.GetLocalizedResource() };
+			foreach (var (command, label) in GetArrangementCommands())
+			{
+				var item = new MenuFlyoutItem { Text = label };
+				item.Click += (_, _) => Arrange(command);
+				arrange.Items.Add(item);
+			}
+			menu.Items.Add(arrange);
 			Add(Strings.Close.GetLocalizedResource(), Close);
 			return menu;
 		}
@@ -177,21 +264,21 @@ namespace Files.App.Views
 				Navigate(properties.IsXButton1Pressed ? -1 : 1);
 				e.Handled = true;
 			}
-			else if (properties.IsLeftButtonPressed)
-			{
-				for (var element = e.OriginalSource as DependencyObject; element is not null; element = VisualTreeHelper.GetParent(element))
-				{
-					if (element is Button)
-						return;
-				}
-				host.Focus(FocusState.Pointer);
-				PInvoke.ReleaseCapture();
-				PInvoke.SendMessage(new(WindowHandle), 0x00A1, new WPARAM(2), default);
-			}
 		}
 
-		protected override bool OnWindowMessageReceived(uint message, WPARAM wParam, LPARAM lParam, ref LRESULT result)
+		protected override unsafe bool OnWindowMessageReceived(uint message, WPARAM wParam, LPARAM lParam, ref LRESULT result)
 		{
+			if (message == 0x0083 && wParam.Value != 0) // WM_NCCALCSIZE
+			{
+				if (PInvoke.IsZoomed(new(WindowHandle)))
+				{
+					MONITORINFO info = new() { cbSize = (uint)sizeof(MONITORINFO) };
+					if (PInvoke.GetMonitorInfo(PInvoke.MonitorFromWindow(new(WindowHandle), MONITOR_FROM_FLAGS.MONITOR_DEFAULTTONEAREST), &info))
+						((NCCALCSIZE_PARAMS*)lParam.Value)->rgrc[0] = info.rcWork;
+				}
+				result = default;
+				return true;
+			}
 			if (message == 0x0084 && PInvoke.GetWindowRect(new(WindowHandle), out var bounds))
 			{
 				var x = (short)((long)lParam.Value & 0xffff);
@@ -276,14 +363,7 @@ namespace Files.App.Views
 				if (initialSize)
 				{
 					initialSize = false;
-					var area = DisplayArea.GetFromWindowId(AppWindow.Id, DisplayAreaFallback.Primary).WorkArea;
-					var frameWidth = AppWindow.Size.Width - AppWindow.ClientSize.Width;
-					var frameHeight = AppWindow.Size.Height - AppWindow.ClientSize.Height;
-					var fit = Math.Min(1, Math.Min((double)(area.Width - frameWidth) / pixelWidth, (double)(area.Height - frameHeight) / pixelHeight));
-					var width = Math.Max(150, (int)(pixelWidth * fit));
-					var height = Math.Max(112, (int)(pixelHeight * fit));
-					AppWindow.ResizeClient(new(width, height));
-					AppWindow.Move(new(area.X + (area.Width - AppWindow.Size.Width) / 2, area.Y + (area.Height - AppWindow.Size.Height) / 2));
+					ResizeToNative();
 				}
 				FitImage();
 				var scale = DesiredScale();
