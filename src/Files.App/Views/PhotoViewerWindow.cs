@@ -382,7 +382,21 @@ namespace Files.App.Views
 			{
 				status.Text = string.Empty;
 			}
-			_ = LoadAsync(paths[index], cancellation);
+			var path = paths[index];
+			if (!DispatcherQueue.TryEnqueue(DispatcherQueuePriority.Low, () =>
+			{
+				if (closed || cancellation.IsCancellationRequested)
+				{
+					if (ReferenceEquals(loadCancellation, cancellation)) loadCancellation = null;
+					cancellation.Dispose();
+					return;
+				}
+				_ = LoadAsync(path, cancellation);
+			}))
+			{
+				loadCancellation = null;
+				cancellation.Dispose();
+			}
 		}
 
 		private void ClearImage()

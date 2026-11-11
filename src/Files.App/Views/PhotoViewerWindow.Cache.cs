@@ -20,10 +20,11 @@ namespace Files.App.Views
 		private readonly CancellationTokenSource cacheLifetime = new();
 		private PreparedPhoto? displayedPhoto;
 
-		private sealed class PreparedPhoto(string path, SoftwareBitmapSource source, uint width, uint height, double scale, Windows.UI.Color background, byte[] preview, bool cacheQuality)
+		private sealed class PreparedPhoto(string path, SoftwareBitmapSource source, SoftwareBitmap bitmap, uint width, uint height, double scale, Windows.UI.Color background, byte[] preview, bool cacheQuality)
 		{
 			internal string Path { get; } = path;
 			internal SoftwareBitmapSource Source { get; } = source;
+			private SoftwareBitmap Bitmap { get; } = bitmap;
 			internal uint Width { get; } = width;
 			internal uint Height { get; } = height;
 			internal double Scale { get; } = scale;
@@ -37,6 +38,7 @@ namespace Files.App.Views
 				if (disposed) return;
 				disposed = true;
 				Source.Dispose();
+				Bitmap.Dispose();
 			}
 		}
 
@@ -165,11 +167,12 @@ namespace Files.App.Views
 			var cacheScale = Math.Min(1, Math.Min(fit, Math.Sqrt(CachePixels / (width * (double)height))));
 			var scale = cacheQuality ? cacheScale : Math.Min(1, Math.Min(fit * zoom, Math.Sqrt(MaxDecodedPixels / (width * (double)height))));
 			SoftwareBitmapSource? source = null;
+			SoftwareBitmap? bitmap = null;
 			PreparedPhoto? result = null;
 			try
 			{
 				var bitmapTransform = new BitmapTransform { ScaledWidth = Math.Max(1, (uint)(decoder.PixelWidth * scale)), ScaledHeight = Math.Max(1, (uint)(decoder.PixelHeight * scale)), InterpolationMode = BitmapInterpolationMode.Fant };
-				using var bitmap = await decoder.GetSoftwareBitmapAsync(BitmapPixelFormat.Bgra8, BitmapAlphaMode.Premultiplied, bitmapTransform, ExifOrientationMode.RespectExifOrientation, ColorManagementMode.ColorManageToSRgb).AsTask(token);
+				bitmap = await decoder.GetSoftwareBitmapAsync(BitmapPixelFormat.Bgra8, BitmapAlphaMode.Premultiplied, bitmapTransform, ExifOrientationMode.RespectExifOrientation, ColorManagementMode.ColorManageToSRgb).AsTask(token);
 				source = new SoftwareBitmapSource();
 				await source.SetBitmapAsync(bitmap);
 				token.ThrowIfCancellationRequested();
@@ -184,11 +187,12 @@ namespace Files.App.Views
 				for (var i = 0; i < pixels.Length; i += 4) { blue += pixels[i]; green += pixels[i + 1]; red += pixels[i + 2]; alpha += pixels[i + 3]; }
 				var background = Windows.UI.Color.FromArgb(255, (byte)(red * 255 / Math.Max(1, alpha)), (byte)(green * 255 / Math.Max(1, alpha)), (byte)(blue * 255 / Math.Max(1, alpha)));
 				token.ThrowIfCancellationRequested();
-				result = new(path, source, width, height, scale, background, preview, cacheQuality || Math.Abs(scale - cacheScale) < 0.0001);
+				result = new(path, source, bitmap, width, height, scale, background, preview, cacheQuality || Math.Abs(scale - cacheScale) < 0.0001);
 				source = null;
+				bitmap = null;
 				return result;
 			}
-			catch { source?.Dispose(); result?.Dispose(); throw; }
+			catch { source?.Dispose(); bitmap?.Dispose(); result?.Dispose(); throw; }
 		}
 	}
 }
