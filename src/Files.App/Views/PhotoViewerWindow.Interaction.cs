@@ -100,6 +100,11 @@ namespace Files.App.Views
 			if (closed || opening != latestOpening) return;
 			var foreground = PInvoke.GetForegroundWindow();
 			if (foreground != new HWND(MainWindow.Instance.WindowHandle) && foreground != new HWND(WindowHandle)) return;
+			RaiseToFront();
+		}
+
+		private void RaiseToFront()
+		{
 			// Activation alone can leave an active window behind another window in the Z order.
 			PInvoke.SetWindowPos(new(WindowHandle), new HWND(0), 0, 0, 0, 0,
 				SET_WINDOW_POS_FLAGS.SWP_NOMOVE | SET_WINDOW_POS_FLAGS.SWP_NOSIZE | SET_WINDOW_POS_FLAGS.SWP_SHOWWINDOW);

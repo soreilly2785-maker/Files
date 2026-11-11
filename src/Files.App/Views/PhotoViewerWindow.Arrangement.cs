@@ -12,6 +12,14 @@ namespace Files.App.Views
 		internal const string TaskArgumentPrefix = "files-photo-window:";
 		private static readonly List<PhotoViewerWindow> openWindows = [];
 		private static PhotoViewerWindow? lastActiveWindow;
+		private static readonly List<PhotoWindowSet> windowSets = [];
+
+		private sealed class PhotoWindowSet(List<PhotoViewerWindow> windows, int columns, int rows)
+		{
+			internal List<PhotoViewerWindow> Windows { get; } = windows;
+			internal int Columns { get; } = columns;
+			internal int Rows { get; } = rows;
+		}
 
 		internal static bool HasOpenWindows => openWindows.Count != 0;
 
@@ -26,9 +34,11 @@ namespace Files.App.Views
 			yield return ("maximize", Strings.PhotoViewerMaximizeAll.GetLocalizedResource());
 			yield return ("native", Strings.PhotoViewerRestoreAll.GetLocalizedResource());
 			yield return ("tile", Strings.PhotoViewerTileAll.GetLocalizedResource());
+			yield return ("auto", Strings.PhotoViewerAutoArrange.GetLocalizedResource());
 			yield return ("columns3", Strings.PhotoViewerThreeColumns.GetLocalizedResource());
 			yield return ("columns4", Strings.PhotoViewerFourColumns.GetLocalizedResource());
 			yield return ("grid4", Strings.PhotoViewerFourGrid.GetLocalizedResource());
+			yield return ("grid6", Strings.PhotoViewerSixGrid.GetLocalizedResource());
 		}
 
 		internal static bool TryParseTaskArguments(string? arguments, out int processId, out string command)
@@ -39,7 +49,7 @@ namespace Files.App.Views
 				return false;
 			var parts = arguments[TaskArgumentPrefix.Length..].Split(':');
 			if (parts.Length != 2 || !int.TryParse(parts[0], out processId) || processId <= 0 ||
-				parts[1] is not ("maximize" or "native" or "tile" or "columns3" or "columns4" or "grid4"))
+				parts[1] is not ("maximize" or "native" or "tile" or "auto" or "columns3" or "columns4" or "grid4" or "grid6"))
 				return false;
 			command = parts[1];
 			return true;
@@ -75,14 +85,30 @@ namespace Files.App.Views
 			if (windows.Length == 0) return;
 			var anchor = lastActiveWindow is { closed: false } active ? active : windows[^1];
 			var area = DisplayArea.GetFromWindowId(anchor.AppWindow.Id, DisplayAreaFallback.Primary).WorkArea;
+			var automatic = command == "auto" ? ChooseAutomaticGrid(windows, area) : (Columns: 0, Rows: 0);
 			var columns = command switch
 			{
 				"columns3" => 3,
 				"columns4" => 4,
 				"grid4" => 2,
+				"grid6" => 3,
+				"auto" => automatic.Columns,
 				_ => windows.Length <= 3 ? windows.Length : (int)Math.Ceiling(Math.Sqrt(windows.Length))
 			};
-			var rows = command is "columns3" or "columns4" ? 1 : command == "grid4" ? 2 : (windows.Length + columns - 1) / columns;
+			var rows = command switch
+			{
+				"columns3" or "columns4" => 1,
+				"grid4" or "grid6" => 2,
+				"auto" => automatic.Rows,
+				_ => (windows.Length + columns - 1) / columns
+			};
+			if (command is not ("maximize" or "native"))
+			{
+				windowSets.Clear();
+				var batchSize = columns * rows;
+				for (var start = 0; start < windows.Length; start += batchSize)
+					windowSets.Add(new(windows.Skip(start).Take(batchSize).ToList(), columns, rows));
+			}
 			for (var i = 0; i < windows.Length; i++)
 			{
 				var window = windows[i];
@@ -107,9 +133,40 @@ namespace Files.App.Views
 				var bottom = area.Y + area.Height * (row + 1) / rows;
 				window.AppWindow.MoveAndResize(new RectInt32(left, top, right - left, bottom - top));
 			}
-			var foreground = command is "columns3" or "columns4" or "grid4" ? windows[^1] : anchor;
+			var foreground = command is "columns3" or "columns4" or "grid4" or "grid6" ? windows[^1] : anchor;
 			if (!foreground.closed)
-				Win32Helper.BringToForegroundEx(new(foreground.WindowHandle));
+				foreground.RaiseToFront();
+		}
+
+		private static (int Columns, int Rows) ChooseAutomaticGrid(PhotoViewerWindow[] windows, RectInt32 area)
+		{
+			var best = (Columns: 1, Rows: windows.Length);
+			var bestCoverage = -1d;
+			for (var columns = 1; columns <= windows.Length; columns++)
+			{
+				var rows = (windows.Length + columns - 1) / columns;
+				var cellAspect = (double)area.Width * rows / (area.Height * columns);
+				var coverage = 0d;
+				foreach (var window in windows)
+				{
+					var aspect = window.pixelHeight == 0 ? 4d / 3 : (double)window.pixelWidth / window.pixelHeight;
+					if (window.rotation % 2 != 0) aspect = 1 / aspect;
+					coverage += Math.Min(aspect / cellAspect, cellAspect / aspect);
+				}
+				coverage /= columns * rows;
+				if (coverage > bestCoverage)
+				{
+					bestCoverage = coverage;
+					best = (columns, rows);
+				}
+			}
+			return best;
+		}
+
+		private static void RemoveFromWindowSets(PhotoViewerWindow window)
+		{
+			foreach (var set in windowSets) set.Windows.Remove(window);
+			windowSets.RemoveAll(set => set.Windows.Count == 0);
 		}
 	}
 }

@@ -4783,7 +4783,7 @@
     <value>Maximise or restore</value>
   </data>
   <data name="PhotoViewerArrange" xml:space="preserve">
-    <value>Arrange photo windows</value>
+    <value>Arrange windows</value>
   </data>
   <data name="PhotoViewerMaximizeAll" xml:space="preserve">
     <value>Maximise all</value>
@@ -4805,5 +4805,26 @@
   </data>
   <data name="PhotoViewerResetView" xml:space="preserve">
     <value>Reset zoom/pan</value>
+  </data>
+  <data name="PhotoViewerAutoArrange" xml:space="preserve">
+    <value>Auto arrange</value>
+  </data>
+  <data name="PhotoViewerSixGrid" xml:space="preserve">
+    <value>3×2 batches</value>
+  </data>
+  <data name="PhotoViewerWindowSets" xml:space="preserve">
+    <value>Window sets…</value>
+  </data>
+  <data name="PhotoViewerSetLabel" xml:space="preserve">
+    <value>Set {0} · {1} photos</value>
+  </data>
+  <data name="PhotoViewerEnlargeScreen" xml:space="preserve">
+    <value>Enlarge for screen…</value>
+  </data>
+  <data name="PhotoViewerAlreadyScreenSize" xml:space="preserve">
+    <value>This photo already meets or exceeds the screen size. No resizing is needed.</value>
+  </data>
+  <data name="PhotoViewerScreenFileName" xml:space="preserve">
+    <value>{0} - screen</value>
   </data>
 </root>

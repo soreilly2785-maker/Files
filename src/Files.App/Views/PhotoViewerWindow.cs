@@ -147,6 +147,7 @@ namespace Files.App.Views
 				openingFocusTimer.Stop();
 				ClearImage();
 				openWindows.Remove(this);
+				RemoveFromWindowSets(this);
 				if (lastActiveWindow == this) lastActiveWindow = openWindows.LastOrDefault();
 				DispatcherQueue.TryEnqueue(DispatcherQueuePriority.Low, () => _ = Ioc.Default.GetRequiredService<IWindowsJumpListService>().RefreshPhotoViewerTasksAsync());
 				Dispose();
@@ -213,6 +214,7 @@ namespace Files.App.Views
 			Add(Strings.Copy.GetLocalizedResource(), () => _ = ExportAsync(false));
 			Add(Strings.PhotoViewerSaveAs.GetLocalizedResource(), () => _ = ExportAsync(true));
 			Add(Strings.PhotoViewerResetView.GetLocalizedResource(), ResetView);
+			Add(Strings.PhotoViewerEnlargeScreen.GetLocalizedResource(), () => _ = ExportAsync(true, true));
 			menu.Items.Add(new MenuFlyoutSeparator());
 			Add(Strings.RotateRight.GetLocalizedResource(), () => { rotation = (rotation + 1) % 4; FitImage(); resizeTimer.Start(); });
 			Add(Strings.PhotoViewerFlipHorizontal.GetLocalizedResource(), () => Flip(false));
@@ -227,6 +229,7 @@ namespace Files.App.Views
 				arrange.Items.Add(item);
 			}
 			menu.Items.Add(arrange);
+			Add(Strings.PhotoViewerWindowSets.GetLocalizedResource(), ShowWindowSets);
 			Add(Strings.Close.GetLocalizedResource(), Close);
 			return menu;
 		}
@@ -417,7 +420,7 @@ namespace Files.App.Views
 					BringOpeningToFront();
 					openingFocusTimer.Start();
 				}
-				var sampleScale = Math.Min(1, 32d / Math.Max(decoder.PixelWidth, decoder.PixelHeight));
+				var sampleScale = Math.Min(1, 128d / Math.Max(decoder.PixelWidth, decoder.PixelHeight));
 				bitmapTransform.ScaledWidth = Math.Max(1, (uint)(decoder.PixelWidth * sampleScale));
 				bitmapTransform.ScaledHeight = Math.Max(1, (uint)(decoder.PixelHeight * sampleScale));
 				using var sample = await decoder.GetSoftwareBitmapAsync(BitmapPixelFormat.Bgra8, BitmapAlphaMode.Premultiplied, bitmapTransform, ExifOrientationMode.RespectExifOrientation, ColorManagementMode.ColorManageToSRgb).AsTask(token);
@@ -430,6 +433,7 @@ namespace Files.App.Views
 				}
 				token.ThrowIfCancellationRequested();
 				canvas.Background = new SolidColorBrush(Windows.UI.Color.FromArgb(255, (byte)(red * 255 / Math.Max(1, alpha)), (byte)(green * 255 / Math.Max(1, alpha)), (byte)(blue * 255 / Math.Max(1, alpha))));
+				await StoreSetPreviewAsync(sample, path, token);
 			}
 			catch (OperationCanceledException) { }
 			catch (Exception ex)
@@ -458,7 +462,7 @@ namespace Files.App.Views
 			catch (Exception ex) { Debug.WriteLine(ex); if (!closed) status.Text = Strings.PhotoViewerLoadError.GetLocalizedResource(); }
 		}
 
-		private async Task ExportAsync(bool save)
+		private async Task ExportAsync(bool save, bool enlargeForScreen = false)
 		{
 			if (exporting || image.Source is null || closed)
 				return;
@@ -466,8 +470,16 @@ namespace Files.App.Views
 			var path = paths[index];
 			var exportRotation = rotation;
 			var exportFlip = flipped;
+			var screen = DisplayArea.GetFromWindowId(AppWindow.Id, DisplayAreaFallback.Primary).WorkArea;
 			try
 			{
+				if (enlargeForScreen && pixelWidth != 0 && pixelHeight != 0 &&
+					Math.Min((double)screen.Width / (exportRotation % 2 == 0 ? pixelWidth : pixelHeight),
+						(double)screen.Height / (exportRotation % 2 == 0 ? pixelHeight : pixelWidth)) <= 1)
+				{
+					status.Text = Strings.PhotoViewerAlreadyScreenSize.GetLocalizedResource();
+					return;
+				}
 				SoftwareBitmap bitmap;
 				var file = await StorageFile.GetFileFromPathAsync(path);
 				using (var input = await file.OpenReadAsync())
@@ -477,10 +489,18 @@ namespace Files.App.Views
 				}
 				using var ownedBitmap = bitmap;
 				if (closed) return;
+				var enlarge = enlargeForScreen ? Math.Min((double)screen.Width / (exportRotation % 2 == 0 ? bitmap.PixelWidth : bitmap.PixelHeight),
+					(double)screen.Height / (exportRotation % 2 == 0 ? bitmap.PixelHeight : bitmap.PixelWidth)) : 1;
+				if (enlargeForScreen && enlarge <= 1)
+				{
+					status.Text = Strings.PhotoViewerAlreadyScreenSize.GetLocalizedResource();
+					return;
+				}
 				StorageFile? output = null;
 				if (save)
 				{
-					var picker = new FileSavePicker { SuggestedFileName = Path.GetFileNameWithoutExtension(path) };
+					var name = Path.GetFileNameWithoutExtension(path);
+					var picker = new FileSavePicker { SuggestedFileName = enlargeForScreen ? string.Format(Strings.PhotoViewerScreenFileName.GetLocalizedResource(), name) : name };
 					picker.FileTypeChoices.Add("PNG", [".png"]);
 					picker.FileTypeChoices.Add("JPEG", [".jpg"]);
 					WinRT.Interop.InitializeWithWindow.Initialize(picker, WindowHandle);
@@ -492,6 +512,12 @@ namespace Files.App.Views
 				encoder.SetSoftwareBitmap(bitmap);
 				encoder.BitmapTransform.Rotation = (BitmapRotation)exportRotation;
 				encoder.BitmapTransform.Flip = exportFlip ? BitmapFlip.Horizontal : BitmapFlip.None;
+				if (enlargeForScreen)
+				{
+					encoder.BitmapTransform.ScaledWidth = (uint)Math.Floor(bitmap.PixelWidth * enlarge);
+					encoder.BitmapTransform.ScaledHeight = (uint)Math.Floor(bitmap.PixelHeight * enlarge);
+					encoder.BitmapTransform.InterpolationMode = BitmapInterpolationMode.Cubic;
+				}
 				await encoder.FlushAsync();
 				if (closed) return;
 				encoded.Seek(0);
