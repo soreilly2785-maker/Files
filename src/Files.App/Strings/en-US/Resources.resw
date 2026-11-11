@@ -4801,6 +4801,6 @@
     <value>Arrange photos in batches of four columns</value>
   </data>
   <data name="PhotoViewerFourGrid" xml:space="preserve">
-    <value>Arrange photos in batches of four (2 Ã— 2)</value>
+    <value>Arrange photos in batches of four (2 × 2)</value>
   </data>
 </root>
