@@ -418,3 +418,7 @@ SBSP_ABSOLUTE
 K32EmptyWorkingSet
 GetDoubleClickTime
 SHChangeNotify
+SHGetPropertyStoreForWindow
+PKEY_AppUserModel_ID
+PKEY_AppUserModel_PreventPinning
+IPropertyStore

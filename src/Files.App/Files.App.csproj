@@ -72,6 +72,7 @@
         <DirectPInvoke Include="OLEAUT32" />
         <DirectPInvoke Include="USER32" />
         <DirectPInvoke Include="MPR" />
+        <DirectPInvoke Include="SHELL32" />
         <_WindowsAppRuntimeBootstrapLibrary Include="@(WindowsAppSdkComponentPackages->'%(FullPath)lib\native\$(Platform)\Microsoft.WindowsAppRuntime.Bootstrap.lib')" />
         <NativeLibrary Include="runtimeobject.lib" />
         <NativeLibrary Include="mpr.lib" />
@@ -80,6 +81,9 @@
   
     <ItemGroup>
         <Manifest Include="app.manifest" />
+        <Content Update="Assets\PhotoViewer.ico">
+            <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+        </Content>
         <Content Update="Assets\Resources\**">
             <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
         </Content>

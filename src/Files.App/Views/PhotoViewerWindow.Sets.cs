@@ -42,7 +42,7 @@ namespace Files.App.Views
 			var ungrouped = openWindows.Where(window => !window.closed && !sets.Any(set => set.Windows.Contains(window))).ToList();
 			if (ungrouped.Count != 0) sets.Add(new(ungrouped, Math.Min(3, ungrouped.Count), (ungrouped.Count + 2) / 3));
 			var cards = new StackPanel { Spacing = 8 };
-			var flyout = new Flyout { Content = new ScrollViewer { Content = cards, MaxHeight = 560, MaxWidth = 620, HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled } };
+			var flyout = new Flyout { Placement = FlyoutPlacementMode.Full, Content = new ScrollViewer { Content = cards, MaxHeight = 560, MaxWidth = 620, HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled } };
 			for (var index = 0; index < sets.Count; index++)
 			{
 				var set = sets[index];

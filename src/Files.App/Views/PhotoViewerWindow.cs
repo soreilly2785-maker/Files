@@ -77,7 +77,7 @@ namespace Files.App.Views
 		}
 
 		[DynamicWindowsRuntimeCast(typeof(OverlappedPresenter))]
-		private PhotoViewerWindow(string[] paths, int index) : base(120, 90)
+		private PhotoViewerWindow(string[] paths, int index) : base(200, 90)
 		{
 			this.paths = paths;
 			this.index = index;
@@ -87,6 +87,7 @@ namespace Files.App.Views
 				presenter.SetBorderAndTitleBar(false, false);
 				presenter.IsResizable = true;
 			}
+			InitializePhotoTaskbar();
 			RemoveFrame();
 			AppWindow.Move(MainWindow.Instance.AppWindow.Position);
 			AppWindow.ResizeClient(new(800, 600));
@@ -101,6 +102,7 @@ namespace Files.App.Views
 			canvas.Children.Add(next);
 			AddWindowControl(Symbol.Remove, Strings.PhotoViewerMinimize.GetLocalizedResource(), Minimize);
 			AddWindowControl(Symbol.FullScreen, Strings.PhotoViewerMaximizeRestore.GetLocalizedResource(), ToggleMaximize);
+			AddWindowControl(Symbol.BackToWindow, Strings.PhotoViewerHalfScreen.GetLocalizedResource(), ResizeToHalfScreen);
 			AddWindowControl(Symbol.Cancel, Strings.Close.GetLocalizedResource(), Close);
 			canvas.Children.Add(windowControls);
 			host.Content = canvas;
@@ -240,6 +242,7 @@ namespace Files.App.Views
 			Add(Strings.Copy.GetLocalizedResource(), () => _ = ExportAsync(false));
 			Add(Strings.PhotoViewerSaveAs.GetLocalizedResource(), () => _ = ExportAsync(true));
 			Add(Strings.PhotoViewerResetView.GetLocalizedResource(), ResetView);
+			Add(Strings.PhotoViewerHalfScreen.GetLocalizedResource(), ResizeToHalfScreen);
 			Add(Strings.PhotoViewerEnlargeScreen.GetLocalizedResource(), () => _ = ExportAsync(true, true));
 			menu.Items.Add(new MenuFlyoutSeparator());
 			Add(Strings.RotateRight.GetLocalizedResource(), () => { rotation = (rotation + 1) % 4; FitImage(); resizeTimer.Start(); });
@@ -248,7 +251,7 @@ namespace Files.App.Views
 			menu.Items.Add(new MenuFlyoutSeparator());
 			Add(Strings.OpenWith.GetLocalizedResource(), () => _ = OpenWithAsync());
 			var arrange = new MenuFlyoutSubItem { Text = Strings.PhotoViewerArrange.GetLocalizedResource() };
-			foreach (var (command, label) in GetArrangementCommands())
+			foreach (var (command, label) in GetArrangementCommands().Where(item => item.Command != "close"))
 			{
 				var item = new MenuFlyoutItem { Text = label };
 				item.Click += (_, _) => DispatcherQueue.TryEnqueue(DispatcherQueuePriority.Low, () => Arrange(command));
@@ -257,6 +260,7 @@ namespace Files.App.Views
 			menu.Items.Add(arrange);
 			Add(Strings.PhotoViewerWindowSets.GetLocalizedResource(), () => DispatcherQueue.TryEnqueue(DispatcherQueuePriority.Low, ShowWindowSets));
 			Add(Strings.Close.GetLocalizedResource(), Close);
+			Add(Strings.PhotoViewerCloseAll.GetLocalizedResource(), () => DispatcherQueue.TryEnqueue(DispatcherQueuePriority.Low, CloseAllPhotos));
 			return menu;
 		}
 
@@ -290,6 +294,7 @@ namespace Files.App.Views
 				case VirtualKey.Right: Navigate(1); break;
 				case VirtualKey.Escape:
 					if (zoom != 1 || panX != 0 || panY != 0) ResetView();
+					else if (IsLargerThanHalfScreen()) ResizeToHalfScreen();
 					else Close();
 					break;
 				default: return;
@@ -309,6 +314,7 @@ namespace Files.App.Views
 
 		protected override unsafe bool OnWindowMessageReceived(uint message, WPARAM wParam, LPARAM lParam, ref LRESULT result)
 		{
+			if (message == 0x0002) ClearPhotoTaskbar(); // WM_DESTROY
 			if (message == 0x0083 && wParam.Value != 0) // WM_NCCALCSIZE
 			{
 				if (PInvoke.IsZoomed(new(WindowHandle)))

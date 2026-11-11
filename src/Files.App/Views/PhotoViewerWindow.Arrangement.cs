@@ -39,6 +39,7 @@ namespace Files.App.Views
 			yield return ("columns4", Strings.PhotoViewerFourColumns.GetLocalizedResource());
 			yield return ("grid4", Strings.PhotoViewerFourGrid.GetLocalizedResource());
 			yield return ("grid6", Strings.PhotoViewerSixGrid.GetLocalizedResource());
+			yield return ("close", Strings.PhotoViewerCloseAll.GetLocalizedResource());
 		}
 
 		internal static bool TryParseTaskArguments(string? arguments, out int processId, out string command)
@@ -49,7 +50,7 @@ namespace Files.App.Views
 				return false;
 			var parts = arguments[TaskArgumentPrefix.Length..].Split(':');
 			if (parts.Length != 2 || !int.TryParse(parts[0], out processId) || processId <= 0 ||
-				parts[1] is not ("maximize" or "native" or "tile" or "auto" or "columns3" or "columns4" or "grid4" or "grid6"))
+				parts[1] is not ("maximize" or "native" or "tile" or "auto" or "columns3" or "columns4" or "grid4" or "grid6" or "close"))
 				return false;
 			command = parts[1];
 			return true;
@@ -64,6 +65,28 @@ namespace Files.App.Views
 				presenter.Restore();
 			else
 				presenter.Maximize();
+		}
+
+		private bool IsLargerThanHalfScreen()
+		{
+			var area = DisplayArea.GetFromWindowId(AppWindow.Id, DisplayAreaFallback.Primary).WorkArea;
+			return Presenter?.State == OverlappedPresenterState.Maximized || AppWindow.Size.Width > area.Width / 2 + 2 || AppWindow.Size.Height > area.Height / 2 + 2;
+		}
+
+		private void ResizeToHalfScreen()
+		{
+			var area = DisplayArea.GetFromWindowId(AppWindow.Id, DisplayAreaFallback.Primary).WorkArea;
+			Presenter?.Restore();
+			ResetView();
+			var width = area.Width / 2;
+			var height = area.Height / 2;
+			AppWindow.MoveAndResize(new(area.X + (area.Width - width) / 2, area.Y + (area.Height - height) / 2, width, height));
+		}
+
+		private static void CloseAllPhotos()
+		{
+			foreach (var window in openWindows.ToArray())
+				if (!window.closed) window.Close();
 		}
 
 		private void ResizeToNative()
@@ -81,6 +104,7 @@ namespace Files.App.Views
 
 		internal static void Arrange(string command)
 		{
+			if (command == "close") { CloseAllPhotos(); return; }
 			var windows = openWindows.Where(window => !window.closed).ToArray();
 			if (windows.Length == 0) return;
 			var anchor = lastActiveWindow is { closed: false } active ? active : windows[^1];

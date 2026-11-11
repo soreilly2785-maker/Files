@@ -4755,6 +4755,12 @@
   <data name="SearchForQuery" xml:space="preserve">
     <value>Search for `{0}`</value>
   </data>
+  <data name="PhotoViewerHalfScreen" xml:space="preserve">
+    <value>50% screen size</value>
+  </data>
+  <data name="PhotoViewerCloseAll" xml:space="preserve">
+    <value>Close all photos</value>
+  </data>
   <data name="PhotoViewerPrevious" xml:space="preserve">
     <value>Previous photo</value>
   </data>
