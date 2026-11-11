@@ -4779,6 +4779,9 @@
   <data name="PhotoViewerFillAll" xml:space="preserve">
     <value>Fill all photo windows</value>
   </data>
+  <data name="PhotoViewerNoSets" xml:space="preserve">
+    <value>Open photos in Files to create a set.</value>
+  </data>
   <data name="PhotoViewerSetsDragHint" xml:space="preserve">
     <value>Drag photos between sets. Hold Ctrl to swap photos.</value>
   </data>

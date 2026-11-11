@@ -81,7 +81,7 @@ namespace Files.App.Views
 				{
 					refreshPending = false;
 					if (closed) return;
-					if (openWindows.Count == 0) Close();
+					if (openWindows.Count == 0 && pin.IsChecked != true) Close();
 					else if (draggingPhoto is null) Rebuild();
 				});
 			}
@@ -91,6 +91,7 @@ namespace Files.App.Views
 				cards.Children.Clear();
 				buttons.Clear();
 				var sets = GetWindowSets();
+				if (sets.Length == 0) cards.Children.Add(new TextBlock { Text = Strings.PhotoViewerNoSets.GetLocalizedResource(), TextWrapping = TextWrapping.Wrap });
 				for (var index = 0; index < sets.Length; index++)
 				{
 					var set = sets[index];
@@ -183,7 +184,7 @@ namespace Files.App.Views
 
 		private static void MoveBetweenSets(PhotoViewerWindow photo, PhotoWindowSet? destination, PhotoViewerWindow? target, bool swap)
 		{
-			if (photo.closed || ReferenceEquals(photo, target)) return;
+			if (photo.closed || target?.closed == true || ReferenceEquals(photo, target)) return;
 			var source = windowSets.FirstOrDefault(set => set.Windows.Contains(photo));
 			if (source is null || destination is not null && !windowSets.Contains(destination)) return;
 			var sourceArea = DisplayArea.GetFromWindowId(photo.AppWindow.Id, DisplayAreaFallback.Primary).WorkArea;

@@ -311,7 +311,8 @@ namespace Files.App.Views
 					if (Microsoft.UI.Input.InputKeyboardSource.GetKeyStateForCurrentThread(VirtualKey.Control).HasFlag(Windows.UI.Core.CoreVirtualKeyStates.Down) ||
 						Microsoft.UI.Input.InputKeyboardSource.GetKeyStateForCurrentThread(VirtualKey.Menu).HasFlag(Windows.UI.Core.CoreVirtualKeyStates.Down)) return;
 					var permanently = Microsoft.UI.Input.InputKeyboardSource.GetKeyStateForCurrentThread(VirtualKey.Shift).HasFlag(Windows.UI.Core.CoreVirtualKeyStates.Down);
-					DispatcherQueue.TryEnqueue(DispatcherQueuePriority.Low, () => _ = DeletePhotoAsync(permanently));
+					var deletePath = paths[index];
+					DispatcherQueue.TryEnqueue(DispatcherQueuePriority.Low, () => _ = DeletePhotoAsync(deletePath, permanently));
 					break;
 				case VirtualKey.Left: Navigate(-1); break;
 				case VirtualKey.Right: Navigate(1); break;

@@ -12,10 +12,9 @@ namespace Files.App.Views
 		private static readonly HashSet<string> pendingDeletes = new(StringComparer.OrdinalIgnoreCase);
 		private bool deleting;
 
-		private async Task DeletePhotoAsync(bool permanently)
+		private async Task DeletePhotoAsync(string path, bool permanently)
 		{
-			if (closed || deleting || exporting || !HasCurrentPhoto) return;
-			var path = paths[index];
+			if (closed || deleting || exporting || !HasCurrentPhoto || !StringComparer.OrdinalIgnoreCase.Equals(paths[index], path)) return;
 			if (!pendingDeletes.Add(path)) return;
 			deleting = true;
 			try
