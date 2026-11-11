@@ -4786,21 +4786,24 @@
     <value>Arrange photo windows</value>
   </data>
   <data name="PhotoViewerMaximizeAll" xml:space="preserve">
-    <value>Maximise all photo windows</value>
+    <value>Maximise all</value>
   </data>
   <data name="PhotoViewerRestoreAll" xml:space="preserve">
-    <value>Restore all photos to native size</value>
+    <value>Restore all (native)</value>
   </data>
   <data name="PhotoViewerTileAll" xml:space="preserve">
-    <value>Tile all photo windows</value>
+    <value>Tile all</value>
   </data>
   <data name="PhotoViewerThreeColumns" xml:space="preserve">
-    <value>Arrange photos in batches of three columns</value>
+    <value>3-column batches</value>
   </data>
   <data name="PhotoViewerFourColumns" xml:space="preserve">
-    <value>Arrange photos in batches of four columns</value>
+    <value>4-column batches</value>
   </data>
   <data name="PhotoViewerFourGrid" xml:space="preserve">
-    <value>Arrange photos in batches of four (2 × 2)</value>
+    <value>2×2 batches</value>
+  </data>
+  <data name="PhotoViewerResetView" xml:space="preserve">
+    <value>Reset zoom/pan</value>
   </data>
 </root>

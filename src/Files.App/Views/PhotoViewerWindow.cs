@@ -71,8 +71,8 @@ namespace Files.App.Views
 			{
 				var window = new PhotoViewerWindow(paths, index);
 				window.Activate();
-				Win32Helper.BringToForegroundEx(new(window.WindowHandle));
-				window.host.Focus(FocusState.Programmatic);
+				window.BringOpeningToFront();
+				window.openingFocusTimer.Start();
 				window.StartLoad();
 			});
 		}
@@ -107,6 +107,7 @@ namespace Files.App.Views
 			host.Content = canvas;
 			Content = host;
 			host.AddHandler(UIElement.KeyDownEvent, new KeyEventHandler(OnKeyDown), true);
+			InitializeImageInteraction();
 			canvas.PointerPressed += OnPointerPressed;
 			canvas.PointerEntered += (_, _) => { previous.Opacity = next.Opacity = 1; };
 			canvas.PointerMoved += (_, e) =>
@@ -124,6 +125,10 @@ namespace Files.App.Views
 			};
 			canvas.ContextFlyout = CreateMenu();
 			resizeTimer = DispatcherQueue.CreateTimer();
+			openingFocusTimer = DispatcherQueue.CreateTimer();
+			openingFocusTimer.Interval = TimeSpan.FromMilliseconds(200);
+			openingFocusTimer.IsRepeating = false;
+			openingFocusTimer.Tick += (_, _) => BringOpeningToFront();
 			resizeTimer.Interval = TimeSpan.FromMilliseconds(180);
 			resizeTimer.IsRepeating = false;
 			resizeTimer.Tick += (_, _) =>
@@ -131,7 +136,7 @@ namespace Files.App.Views
 				var desired = DesiredScale();
 				if (!closed && (desired > decodedScale * 1.1 || desired < decodedScale * 0.7)) StartLoad(false);
 			};
-			canvas.SizeChanged += (_, _) => { FitImage(); resizeTimer.Stop(); resizeTimer.Start(); UpdateDragRegions(); };
+			canvas.SizeChanged += (_, _) => { UpdateViewport(); FitImage(); resizeTimer.Stop(); resizeTimer.Start(); UpdateDragRegions(); };
 			windowControls.SizeChanged += (_, _) => UpdateDragRegions();
 			host.Loaded += (_, _) => UpdateDragRegions();
 			Closed += (_, _) =>
@@ -139,6 +144,7 @@ namespace Files.App.Views
 				closed = true;
 				loadCancellation?.Cancel();
 				resizeTimer.Stop();
+				openingFocusTimer.Stop();
 				ClearImage();
 				openWindows.Remove(this);
 				if (lastActiveWindow == this) lastActiveWindow = openWindows.LastOrDefault();
@@ -206,6 +212,7 @@ namespace Files.App.Views
 			}
 			Add(Strings.Copy.GetLocalizedResource(), () => _ = ExportAsync(false));
 			Add(Strings.PhotoViewerSaveAs.GetLocalizedResource(), () => _ = ExportAsync(true));
+			Add(Strings.PhotoViewerResetView.GetLocalizedResource(), ResetView);
 			menu.Items.Add(new MenuFlyoutSeparator());
 			Add(Strings.RotateRight.GetLocalizedResource(), () => { rotation = (rotation + 1) % 4; FitImage(); resizeTimer.Start(); });
 			Add(Strings.PhotoViewerFlipHorizontal.GetLocalizedResource(), () => Flip(false));
@@ -235,9 +242,11 @@ namespace Files.App.Views
 
 		private void Navigate(int direction)
 		{
-			if (exporting || index + direction < 0 || index + direction >= paths.Length)
+			if (exporting || paths.Length < 2)
 				return;
-			index += direction;
+			index = (index + direction + paths.Length) % paths.Length;
+			ResetView();
+			resizeTimer.Stop();
 			rotation = 0;
 			flipped = false;
 			pixelWidth = pixelHeight = 0;
@@ -250,7 +259,10 @@ namespace Files.App.Views
 			{
 				case VirtualKey.Left: Navigate(-1); break;
 				case VirtualKey.Right: Navigate(1); break;
-				case VirtualKey.Escape: Close(); break;
+				case VirtualKey.Escape:
+					if (zoom != 1 || panX != 0 || panY != 0) ResetView();
+					else Close();
+					break;
 				default: return;
 			}
 			e.Handled = true;
@@ -309,7 +321,8 @@ namespace Files.App.Views
 			var scale = canvas.XamlRoot?.RasterizationScale ?? 1;
 			var width = rotation % 2 == 0 ? pixelWidth : pixelHeight;
 			var height = rotation % 2 == 0 ? pixelHeight : pixelWidth;
-			return Math.Min(1, Math.Min(Math.Max(1, canvas.ActualWidth) * scale / width, Math.Max(1, canvas.ActualHeight) * scale / height));
+			var budget = Math.Min(1, Math.Sqrt(MaxDecodedPixels / (pixelWidth * (double)pixelHeight)));
+			return Math.Min(budget, zoom * Math.Min(Math.Max(1, canvas.ActualWidth) * scale / width, Math.Max(1, canvas.ActualHeight) * scale / height));
 		}
 
 		private void FitImage()
@@ -324,9 +337,11 @@ namespace Files.App.Views
 			image.HorizontalAlignment = HorizontalAlignment.Center;
 			image.VerticalAlignment = VerticalAlignment.Center;
 			transform.Rotation = rotation * 90;
-			transform.ScaleX = flipped ? -1 : 1;
-			previous.IsEnabled = index > 0;
-			next.IsEnabled = index + 1 < paths.Length;
+			transform.ScaleX = flipped ? -zoom : zoom;
+			transform.ScaleY = zoom;
+			transform.TranslateX = panX;
+			transform.TranslateY = panY;
+			previous.IsEnabled = next.IsEnabled = paths.Length > 1;
 		}
 
 		private void StartLoad(bool clear = true)
@@ -396,6 +411,12 @@ namespace Files.App.Views
 				decodedScale = scale;
 				Title = Path.GetFileName(path);
 				status.Text = string.Empty;
+				if (openingImage)
+				{
+					openingImage = false;
+					BringOpeningToFront();
+					openingFocusTimer.Start();
+				}
 				var sampleScale = Math.Min(1, 32d / Math.Max(decoder.PixelWidth, decoder.PixelHeight));
 				bitmapTransform.ScaledWidth = Math.Max(1, (uint)(decoder.PixelWidth * sampleScale));
 				bitmapTransform.ScaledHeight = Math.Max(1, (uint)(decoder.PixelHeight * sampleScale));

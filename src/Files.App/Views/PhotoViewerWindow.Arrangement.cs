@@ -65,7 +65,7 @@ namespace Files.App.Views
 			var nativeWidth = rotation % 2 == 0 ? pixelWidth : pixelHeight;
 			var nativeHeight = rotation % 2 == 0 ? pixelHeight : pixelWidth;
 			var fit = Math.Min(1, Math.Min((double)(area.Width - frameWidth) / nativeWidth, (double)(area.Height - frameHeight) / nativeHeight));
-			AppWindow.ResizeClient(new(Math.Max(150, (int)(nativeWidth * fit)), Math.Max(112, (int)(nativeHeight * fit))));
+			AppWindow.Resize(new(Math.Max(150, (int)(nativeWidth * fit)) + frameWidth, Math.Max(112, (int)(nativeHeight * fit)) + frameHeight));
 			AppWindow.Move(new(area.X + (area.Width - AppWindow.Size.Width) / 2, area.Y + (area.Height - AppWindow.Size.Height) / 2));
 		}
 
