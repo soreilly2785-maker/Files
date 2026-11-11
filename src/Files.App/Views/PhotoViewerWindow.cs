@@ -225,11 +225,11 @@ namespace Files.App.Views
 			foreach (var (command, label) in GetArrangementCommands())
 			{
 				var item = new MenuFlyoutItem { Text = label };
-				item.Click += (_, _) => Arrange(command);
+				item.Click += (_, _) => DispatcherQueue.TryEnqueue(DispatcherQueuePriority.Low, () => Arrange(command));
 				arrange.Items.Add(item);
 			}
 			menu.Items.Add(arrange);
-			Add(Strings.PhotoViewerWindowSets.GetLocalizedResource(), ShowWindowSets);
+			Add(Strings.PhotoViewerWindowSets.GetLocalizedResource(), () => DispatcherQueue.TryEnqueue(DispatcherQueuePriority.Low, ShowWindowSets));
 			Add(Strings.Close.GetLocalizedResource(), Close);
 			return menu;
 		}

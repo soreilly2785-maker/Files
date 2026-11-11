@@ -21,12 +21,14 @@ namespace Files.App.Views
 		{
 			if (StringComparer.OrdinalIgnoreCase.Equals(previewPath, path)) return;
 			using var stream = new InMemoryRandomAccessStream();
-			var encoder = await BitmapEncoder.CreateAsync(BitmapEncoder.PngEncoderId, stream).AsTask(token);
+			var encoder = await BitmapEncoder.CreateAsync(BitmapEncoder.PngEncoderId, stream);
+			token.ThrowIfCancellationRequested();
 			encoder.SetSoftwareBitmap(sample);
-			await encoder.FlushAsync().AsTask(token);
+			await encoder.FlushAsync();
+			token.ThrowIfCancellationRequested();
 			stream.Seek(0);
 			var bytes = new byte[(int)stream.Size];
-			await stream.ReadAsync(bytes.AsBuffer(), (uint)bytes.Length, InputStreamOptions.None).AsTask(token);
+			await stream.ReadAsync(bytes.AsBuffer(), (uint)bytes.Length, InputStreamOptions.None);
 			token.ThrowIfCancellationRequested();
 			previewBytes = bytes;
 			previewPath = path;
@@ -74,13 +76,16 @@ namespace Files.App.Views
 				var button = new Button { Content = content, HorizontalContentAlignment = HorizontalAlignment.Left, HorizontalAlignment = HorizontalAlignment.Stretch };
 				button.Click += (_, _) =>
 				{
-					flyout.Hide();
-					foreach (var window in windows)
+					flyout.Closed += (_, _) => DispatcherQueue.TryEnqueue(Microsoft.UI.Dispatching.DispatcherQueuePriority.Low, () =>
 					{
-						if (window.closed) continue;
-						if (window.Presenter is { State: Microsoft.UI.Windowing.OverlappedPresenterState.Minimized } presenter) presenter.Restore();
-						window.RaiseToFront();
-					}
+						foreach (var window in windows)
+						{
+							if (window.closed) continue;
+							if (window.Presenter is { State: Microsoft.UI.Windowing.OverlappedPresenterState.Minimized } presenter) presenter.Restore();
+							window.RaiseToFront();
+						}
+					});
+					flyout.Hide();
 				};
 				cards.Children.Add(button);
 			}
