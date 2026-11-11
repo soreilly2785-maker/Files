@@ -31,7 +31,7 @@ namespace Files.App.Views
 {
 	public sealed partial class PhotoViewerWindow : WindowEx
 	{
-		private readonly string[] paths;
+		private string[] paths;
 		private readonly Grid canvas = new();
 		private readonly UserControl host = new() { IsTabStop = true, UseSystemFocusVisuals = false };
 		private readonly Image image = new() { Stretch = Stretch.Fill, RenderTransformOrigin = new(0.5, 0.5) };
@@ -159,13 +159,16 @@ namespace Files.App.Views
 				foreach (var photo in photoCache.Values) photo.Dispose();
 				photoCache.Clear();
 				openWindows.Remove(this);
+				RefreshWindowSetsPanel();
 				RemoveFromWindowSets(this);
 				if (lastActiveWindow == this) lastActiveWindow = openWindows.LastOrDefault();
 				DispatcherQueue.TryEnqueue(DispatcherQueuePriority.Low, () => _ = Ioc.Default.GetRequiredService<IWindowsJumpListService>().RefreshPhotoViewerTasksAsync());
 				Dispose();
 			};
 			openWindows.Add(this);
-			Activated += (_, e) => { if (e.WindowActivationState != WindowActivationState.Deactivated) lastActiveWindow = this; };
+			RefreshWindowSetsPanel();
+			RefreshPhotoTaskbar();
+			Activated += (_, e) => { if (e.WindowActivationState != WindowActivationState.Deactivated) { lastActiveWindow = this; RefreshPhotoTaskbar(); } };
 			_ = Ioc.Default.GetRequiredService<IWindowsJumpListService>().RefreshPhotoViewerTasksAsync();
 		}
 
@@ -230,36 +233,48 @@ namespace Files.App.Views
 			return button;
 		}
 
+		private static IconElement ArrangementIcon(string command) => new BitmapIcon
+		{
+			UriSource = new($"ms-appx:///Assets/PhotoLayouts/{command}.png"),
+			ShowAsMonochrome = true
+		};
+
 		private MenuFlyout CreateMenu()
 		{
 			var menu = new MenuFlyout();
-			void Add(string label, Action action)
+			void Add(string label, Action action, IconElement? icon = null)
 			{
-				var item = new MenuFlyoutItem { Text = label };
+				var item = new MenuFlyoutItem { Text = label, Icon = icon };
 				item.Click += (_, _) => action();
 				menu.Items.Add(item);
 			}
-			Add(Strings.Copy.GetLocalizedResource(), () => _ = ExportAsync(false));
-			Add(Strings.PhotoViewerSaveAs.GetLocalizedResource(), () => _ = ExportAsync(true));
-			Add(Strings.PhotoViewerResetView.GetLocalizedResource(), ResetView);
-			Add(Strings.PhotoViewerHalfScreen.GetLocalizedResource(), ResizeToHalfScreen);
-			Add(Strings.PhotoViewerEnlargeScreen.GetLocalizedResource(), () => _ = ExportAsync(true, true));
-			menu.Items.Add(new MenuFlyoutSeparator());
-			Add(Strings.RotateRight.GetLocalizedResource(), () => { rotation = (rotation + 1) % 4; FitImage(); resizeTimer.Start(); });
-			Add(Strings.PhotoViewerFlipHorizontal.GetLocalizedResource(), () => Flip(false));
-			Add(Strings.PhotoViewerFlipVertical.GetLocalizedResource(), () => Flip(true));
-			menu.Items.Add(new MenuFlyoutSeparator());
-			Add(Strings.OpenWith.GetLocalizedResource(), () => _ = OpenWithAsync());
-			var arrange = new MenuFlyoutSubItem { Text = Strings.PhotoViewerArrange.GetLocalizedResource() };
+			Add(Strings.PhotoViewerWindowSets.GetLocalizedResource(), () => DispatcherQueue.TryEnqueue(DispatcherQueuePriority.Low, ShowWindowSets), new SymbolIcon(Symbol.Pictures));
+			var arrange = new MenuFlyoutSubItem { Text = Strings.PhotoViewerArrange.GetLocalizedResource(), Icon = new SymbolIcon(Symbol.ViewAll) };
 			foreach (var (command, label) in GetArrangementCommands().Where(item => item.Command != "close"))
 			{
-				var item = new MenuFlyoutItem { Text = label };
+				var item = new MenuFlyoutItem { Text = label, Icon = ArrangementIcon(command) };
 				item.Click += (_, _) => DispatcherQueue.TryEnqueue(DispatcherQueuePriority.Low, () => Arrange(command));
 				arrange.Items.Add(item);
 			}
 			menu.Items.Add(arrange);
-			Add(Strings.PhotoViewerWindowSets.GetLocalizedResource(), () => DispatcherQueue.TryEnqueue(DispatcherQueuePriority.Low, ShowWindowSets));
-			Add(Strings.Close.GetLocalizedResource(), Close);
+			Add(Strings.PhotoViewerHalfScreen.GetLocalizedResource(), ResizeToHalfScreen, new SymbolIcon(Symbol.BackToWindow));
+			menu.Items.Add(new MenuFlyoutSeparator());
+			Add(Strings.PhotoViewerFillWindow.GetLocalizedResource(), FillWindow, new SymbolIcon(Symbol.FullScreen));
+			Add(Strings.PhotoViewerFillAll.GetLocalizedResource(), () => Arrange("fill"), new SymbolIcon(Symbol.FullScreen));
+			Add(Strings.PhotoViewerResetView.GetLocalizedResource(), ResetView);
+			Add(Strings.PhotoViewerFitAll.GetLocalizedResource(), () => Arrange("fit"));
+			menu.Items.Add(new MenuFlyoutSeparator());
+			Add(Strings.Copy.GetLocalizedResource(), () => _ = ExportAsync(false), new SymbolIcon(Symbol.Copy));
+			Add(Strings.PhotoViewerSaveAs.GetLocalizedResource(), () => _ = ExportAsync(true), new SymbolIcon(Symbol.Save));
+			Add(Strings.PhotoViewerEnlargeScreen.GetLocalizedResource(), () => _ = ExportAsync(true, true));
+			menu.Items.Add(new MenuFlyoutSeparator());
+			Add(Strings.RotateRight.GetLocalizedResource(), () => { rotation = (rotation + 1) % 4; FitImage(); resizeTimer.Start(); RefreshWindowSetsPanel(); }, new SymbolIcon(Symbol.Rotate));
+			Add(Strings.PhotoViewerFlipHorizontal.GetLocalizedResource(), () => Flip(false));
+			Add(Strings.PhotoViewerFlipVertical.GetLocalizedResource(), () => Flip(true));
+			menu.Items.Add(new MenuFlyoutSeparator());
+			Add(Strings.OpenWith.GetLocalizedResource(), () => _ = OpenWithAsync());
+			menu.Items.Add(new MenuFlyoutSeparator());
+			Add(Strings.Close.GetLocalizedResource(), Close, new SymbolIcon(Symbol.Cancel));
 			Add(Strings.PhotoViewerCloseAll.GetLocalizedResource(), () => DispatcherQueue.TryEnqueue(DispatcherQueuePriority.Low, CloseAllPhotos));
 			return menu;
 		}
@@ -271,15 +286,16 @@ namespace Files.App.Views
 				rotation = (rotation + 2) % 4;
 			flipped = !flipped;
 			FitImage();
+			RefreshWindowSetsPanel();
 		}
 
 		private void Navigate(int direction)
 		{
-			if (exporting || paths.Length < 2)
+			if (exporting || deleting || paths.Length < 2)
 				return;
 			index = (index + direction + paths.Length) % paths.Length;
 			TrimPhotoCache();
-			ResetView();
+			ResetImageTransform(false);
 			resizeTimer.Stop();
 			rotation = 0;
 			flipped = false;
@@ -288,12 +304,19 @@ namespace Files.App.Views
 
 		private void OnKeyDown(object sender, KeyRoutedEventArgs e)
 		{
+			if (deleting) return;
 			switch (e.Key)
 			{
+				case VirtualKey.Delete:
+					if (Microsoft.UI.Input.InputKeyboardSource.GetKeyStateForCurrentThread(VirtualKey.Control).HasFlag(Windows.UI.Core.CoreVirtualKeyStates.Down) ||
+						Microsoft.UI.Input.InputKeyboardSource.GetKeyStateForCurrentThread(VirtualKey.Menu).HasFlag(Windows.UI.Core.CoreVirtualKeyStates.Down)) return;
+					var permanently = Microsoft.UI.Input.InputKeyboardSource.GetKeyStateForCurrentThread(VirtualKey.Shift).HasFlag(Windows.UI.Core.CoreVirtualKeyStates.Down);
+					DispatcherQueue.TryEnqueue(DispatcherQueuePriority.Low, () => _ = DeletePhotoAsync(permanently));
+					break;
 				case VirtualKey.Left: Navigate(-1); break;
 				case VirtualKey.Right: Navigate(1); break;
 				case VirtualKey.Escape:
-					if (zoom != 1 || panX != 0 || panY != 0) ResetView();
+					if (fillWindow || zoom != 1 || panX != 0 || panY != 0) ResetView();
 					else if (IsLargerThanHalfScreen()) ResizeToHalfScreen();
 					else Close();
 					break;
@@ -357,7 +380,7 @@ namespace Files.App.Views
 			var width = rotation % 2 == 0 ? pixelWidth : pixelHeight;
 			var height = rotation % 2 == 0 ? pixelHeight : pixelWidth;
 			var budget = Math.Min(1, Math.Sqrt(MaxDecodedPixels / (pixelWidth * (double)pixelHeight)));
-			return Math.Min(budget, zoom * Math.Min(Math.Max(1, canvas.ActualWidth) * scale / width, Math.Max(1, canvas.ActualHeight) * scale / height));
+			return Math.Min(budget, EffectiveZoom() * Math.Min(Math.Max(1, canvas.ActualWidth) * scale / width, Math.Max(1, canvas.ActualHeight) * scale / height));
 		}
 
 		private void FitImage()
@@ -372,8 +395,9 @@ namespace Files.App.Views
 			image.HorizontalAlignment = HorizontalAlignment.Center;
 			image.VerticalAlignment = VerticalAlignment.Center;
 			transform.Rotation = rotation * 90;
-			transform.ScaleX = flipped ? -zoom : zoom;
-			transform.ScaleY = zoom;
+			var scaleZoom = EffectiveZoom();
+			transform.ScaleX = flipped ? -scaleZoom : scaleZoom;
+			transform.ScaleY = scaleZoom;
 			transform.TranslateX = panX;
 			transform.TranslateY = panY;
 			previous.IsEnabled = next.IsEnabled = paths.Length > 1;
@@ -475,7 +499,7 @@ namespace Files.App.Views
 
 		private async Task ExportAsync(bool save, bool enlargeForScreen = false)
 		{
-			if (exporting || !HasCurrentPhoto || closed)
+			if (exporting || deleting || !HasCurrentPhoto || closed)
 				return;
 			exporting = true;
 			var path = paths[index];

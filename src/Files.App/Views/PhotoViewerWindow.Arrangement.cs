@@ -17,8 +17,8 @@ namespace Files.App.Views
 		private sealed class PhotoWindowSet(List<PhotoViewerWindow> windows, int columns, int rows)
 		{
 			internal List<PhotoViewerWindow> Windows { get; } = windows;
-			internal int Columns { get; } = columns;
-			internal int Rows { get; } = rows;
+			internal int Columns { get; set; } = columns;
+			internal int Rows { get; set; } = rows;
 		}
 
 		internal static bool HasOpenWindows => openWindows.Count != 0;
@@ -50,7 +50,7 @@ namespace Files.App.Views
 				return false;
 			var parts = arguments[TaskArgumentPrefix.Length..].Split(':');
 			if (parts.Length != 2 || !int.TryParse(parts[0], out processId) || processId <= 0 ||
-				parts[1] is not ("maximize" or "native" or "tile" or "auto" or "columns3" or "columns4" or "grid4" or "grid6" or "close"))
+				parts[1] is not ("maximize" or "native" or "tile" or "auto" or "columns3" or "columns4" or "grid4" or "grid6" or "close" or "sets" or "fill" or "fit"))
 				return false;
 			command = parts[1];
 			return true;
@@ -108,6 +108,9 @@ namespace Files.App.Views
 			var windows = openWindows.Where(window => !window.closed).ToArray();
 			if (windows.Length == 0) return;
 			var anchor = lastActiveWindow is { closed: false } active ? active : windows[^1];
+			if (command == "sets") { anchor.ShowWindowSets(); return; }
+			if (command == "fill") { foreach (var window in windows) window.FillWindow(); return; }
+			if (command == "fit") { foreach (var window in windows) window.ResetView(); return; }
 			var area = DisplayArea.GetFromWindowId(anchor.AppWindow.Id, DisplayAreaFallback.Primary).WorkArea;
 			var automatic = command == "auto" ? ChooseAutomaticGrid(windows, area) : (Columns: 0, Rows: 0);
 			var columns = command switch
@@ -157,6 +160,7 @@ namespace Files.App.Views
 				var bottom = area.Y + area.Height * (row + 1) / rows;
 				window.AppWindow.MoveAndResize(new RectInt32(left, top, right - left, bottom - top));
 			}
+			RefreshWindowSetsPanel();
 			var foreground = command is "columns3" or "columns4" or "grid4" or "grid6" ? windows[^1] : anchor;
 			if (!foreground.closed)
 				foreground.RaiseToFront();

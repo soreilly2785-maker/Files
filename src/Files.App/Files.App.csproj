@@ -82,6 +82,9 @@
   
     <ItemGroup>
         <Manifest Include="app.manifest" />
+        <Content Update="Assets\PhotoLayouts\**">
+            <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+        </Content>
         <Content Update="Assets\PhotoViewer.ico">
             <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
         </Content>

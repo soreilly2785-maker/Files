@@ -42,11 +42,13 @@ namespace Files.App.Views
 			}
 		}
 
-		private bool HasCurrentPhoto => displayedPhoto is not null && StringComparer.OrdinalIgnoreCase.Equals(displayedPhoto.Path, paths[index]);
+		private bool HasCurrentPhoto => !closed && displayedPhoto is not null && StringComparer.OrdinalIgnoreCase.Equals(displayedPhoto.Path, paths[index]);
 
 		private HashSet<string> WantedPhotos()
 		{
-			var wanted = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { paths[index] };
+			var wanted = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+			if (closed) return wanted;
+			wanted.Add(paths[index]);
 			for (var distance = 1; distance <= Math.Min(CacheRadius, paths.Length - 1); distance++)
 			{
 				wanted.Add(paths[(index + distance) % paths.Length]);
@@ -89,6 +91,7 @@ namespace Files.App.Views
 			previewBytes = photo.Preview;
 			previewPath = photo.Path;
 			Title = Path.GetFileName(photo.Path);
+			RefreshWindowSetsPanel();
 			status.Text = string.Empty;
 			FitImage();
 			if (photo.CacheQuality) CachePhoto(photo);
@@ -165,7 +168,7 @@ namespace Files.App.Views
 			var fit = Math.Min((double)Math.Max(1, frame.Width) / (photoRotation % 2 == 0 ? width : height),
 				(double)Math.Max(1, frame.Height) / (photoRotation % 2 == 0 ? height : width));
 			var cacheScale = Math.Min(1, Math.Min(fit, Math.Sqrt(CachePixels / (width * (double)height))));
-			var scale = cacheQuality ? cacheScale : Math.Min(1, Math.Min(fit * zoom, Math.Sqrt(MaxDecodedPixels / (width * (double)height))));
+			var scale = cacheQuality ? cacheScale : Math.Min(1, Math.Min(fit * EffectiveZoom(), Math.Sqrt(MaxDecodedPixels / (width * (double)height))));
 			SoftwareBitmapSource? source = null;
 			SoftwareBitmap? bitmap = null;
 			PreparedPhoto? result = null;

@@ -422,3 +422,6 @@ SHGetPropertyStoreForWindow
 PKEY_AppUserModel_ID
 PKEY_AppUserModel_PreventPinning
 IPropertyStore
+IObjectCollection
+EnumerableObjectCollection
+PKEY_Title

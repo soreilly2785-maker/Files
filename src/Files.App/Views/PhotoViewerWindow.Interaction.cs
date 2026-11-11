@@ -20,6 +20,7 @@ namespace Files.App.Views
 		private readonly Microsoft.UI.Dispatching.DispatcherQueueTimer navigationHoverTimer;
 		private bool openingImage = true;
 		private double zoom = 1;
+		private bool fillWindow;
 		private double panX;
 		private double panY;
 		private uint? panPointer;
@@ -69,6 +70,8 @@ namespace Files.App.Views
 			if (!HasCurrentPhoto) return;
 			var point = e.GetCurrentPoint(canvas);
 			if (point.Properties.IsHorizontalMouseWheel) return;
+			zoom = EffectiveZoom();
+			fillWindow = false;
 			var nextZoom = Math.Clamp(zoom * Math.Pow(1.1, point.Properties.MouseWheelDelta / 120d), 0.1, 32);
 			var ratio = nextZoom / zoom;
 			panX = ratio * panX + (1 - ratio) * (point.Position.X - canvas.ActualWidth / 2);
@@ -80,8 +83,27 @@ namespace Files.App.Views
 			e.Handled = true;
 		}
 
-		private void ResetView()
+		private double EffectiveZoom()
 		{
+			if (!fillWindow || pixelWidth == 0 || pixelHeight == 0 || canvas.ActualWidth <= 0 || canvas.ActualHeight <= 0) return zoom;
+			var width = rotation % 2 == 0 ? pixelWidth : pixelHeight;
+			var height = rotation % 2 == 0 ? pixelHeight : pixelWidth;
+			var horizontal = canvas.ActualWidth / width;
+			var vertical = canvas.ActualHeight / height;
+			return zoom * Math.Max(horizontal, vertical) / Math.Min(horizontal, vertical);
+		}
+
+		private void FillWindow()
+		{
+			fillWindow = true;
+			ResetImageTransform(false);
+		}
+
+		private void ResetView() => ResetImageTransform(true);
+
+		private void ResetImageTransform(bool clearFill)
+		{
+			if (clearFill) fillWindow = false;
 			panPointer = null;
 			image.ReleasePointerCaptures();
 			zoom = 1;

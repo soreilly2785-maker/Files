@@ -71,8 +71,7 @@ namespace Files.App
 				throw new InvalidOperationException(Constants.Startup.MissingRuntimeMessage, ex);
 			}
 
-			if (activatedArgs.Data is ILaunchActivatedEventArgs photoArgs &&
-				PhotoViewerWindow.TryParseTaskArguments(photoArgs.Arguments, out var photoProcessId, out _))
+			if (PhotoViewerWindow.TryGetTaskActivation(activatedArgs.Data, out var photoProcessId, out _))
 			{
 				TryRedirectActivationToExistingInstance(activatedArgs, $"Files.Window.{photoProcessId}");
 				return;

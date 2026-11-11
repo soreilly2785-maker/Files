@@ -4755,6 +4755,39 @@
   <data name="SearchForQuery" xml:space="preserve">
     <value>Search for `{0}`</value>
   </data>
+  <data name="PhotoViewerConfirmRecycle" xml:space="preserve">
+    <value>Move “{0}” to the Recycle Bin?</value>
+  </data>
+  <data name="PhotoViewerConfirmPermanentDelete" xml:space="preserve">
+    <value>Permanently delete “{0}”? This cannot be undone.</value>
+  </data>
+  <data name="PhotoViewerDeleteError" xml:space="preserve">
+    <value>Could not delete this photo. It may be in use or require permission.</value>
+  </data>
+  <data name="PhotoViewerFillWindow" xml:space="preserve">
+    <value>Fill window</value>
+  </data>
+  <data name="PhotoViewerFitAll" xml:space="preserve">
+    <value>Fit all photo windows</value>
+  </data>
+  <data name="PhotoViewerSwapPhotos" xml:space="preserve">
+    <value>Swap photos</value>
+  </data>
+  <data name="PhotoViewerMovePhoto" xml:space="preserve">
+    <value>Move photo</value>
+  </data>
+  <data name="PhotoViewerFillAll" xml:space="preserve">
+    <value>Fill all photo windows</value>
+  </data>
+  <data name="PhotoViewerSetsDragHint" xml:space="preserve">
+    <value>Drag photos between sets. Hold Ctrl to swap photos.</value>
+  </data>
+  <data name="PhotoViewerNewSetDrop" xml:space="preserve">
+    <value>Drop a photo here to create a new set</value>
+  </data>
+  <data name="PhotoViewerPinSets" xml:space="preserve">
+    <value>Keep open on top</value>
+  </data>
   <data name="PhotoViewerHalfScreen" xml:space="preserve">
     <value>50% screen size</value>
   </data>
@@ -4810,7 +4843,7 @@
     <value>2×2 batches</value>
   </data>
   <data name="PhotoViewerResetView" xml:space="preserve">
-    <value>Reset zoom/pan</value>
+    <value>Fit image / reset zoom</value>
   </data>
   <data name="PhotoViewerAutoArrange" xml:space="preserve">
     <value>Auto arrange</value>

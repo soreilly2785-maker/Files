@@ -939,7 +939,7 @@ namespace Files.App.Utils.Storage
 			}
 		}
 
-		private static string? GetRecycleMetadataPath(string recyclePath)
+		internal static string? GetRecycleMetadataPath(string recyclePath)
 		{
 			var parentPath = Path.GetDirectoryName(recyclePath);
 			var fileName = Path.GetFileName(recyclePath);
