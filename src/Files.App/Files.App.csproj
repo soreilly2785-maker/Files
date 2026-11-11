@@ -72,10 +72,11 @@
         <DirectPInvoke Include="OLEAUT32" />
         <DirectPInvoke Include="USER32" />
         <DirectPInvoke Include="MPR" />
-        <DirectPInvoke Include="SHELL32" />
+        <DirectPInvoke Include="SHELL32!SHGetPropertyStoreForWindow" />
         <_WindowsAppRuntimeBootstrapLibrary Include="@(WindowsAppSdkComponentPackages->'%(FullPath)lib\native\$(Platform)\Microsoft.WindowsAppRuntime.Bootstrap.lib')" />
         <NativeLibrary Include="runtimeobject.lib" />
         <NativeLibrary Include="mpr.lib" />
+        <NativeLibrary Include="shell32.lib" />
         <NativeLibrary Include="@(_WindowsAppRuntimeBootstrapLibrary->Exists())" />
     </ItemGroup>
   
