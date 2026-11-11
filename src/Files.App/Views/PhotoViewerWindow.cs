@@ -8,7 +8,7 @@ using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Input;
 using Microsoft.UI.Xaml.Media;
 using Microsoft.UI.Xaml.Media.Imaging;
-using Microsoft.UI.Dispatching;
+using DispatcherQueuePriority = Microsoft.UI.Dispatching.DispatcherQueuePriority;
 using Microsoft.UI.Input;
 using System.IO;
 using System.Runtime.InteropServices.WindowsRuntime;
@@ -274,7 +274,11 @@ namespace Files.App.Views
 				{
 					MONITORINFO info = new() { cbSize = (uint)sizeof(MONITORINFO) };
 					if (PInvoke.GetMonitorInfo(PInvoke.MonitorFromWindow(new(WindowHandle), MONITOR_FROM_FLAGS.MONITOR_DEFAULTTONEAREST), &info))
-						((NCCALCSIZE_PARAMS*)lParam.Value)->rgrc[0] = info.rcWork;
+					{
+						var parameters = (NCCALCSIZE_PARAMS*)lParam.Value;
+						// The first rectangle is the proposed client area.
+						*(RECT*)&parameters->rgrc = info.rcWork;
+					}
 				}
 				result = default;
 				return true;

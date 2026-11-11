@@ -144,7 +144,7 @@ namespace Files.App.Services
 			}
 			if (!PhotoViewerWindow.HasOpenWindows) return;
 			foreach (var (command, label) in PhotoViewerWindow.GetArrangementCommands())
-				instance.Items.Add(JumpListItem.CreateWithArguments(prefix + command, label));
+				instance.Items.Add(Windows.UI.StartScreen.JumpListItem.CreateWithArguments(prefix + command, label));
 		}
 
 		public async Task RemoveFolderAsync(string path)
