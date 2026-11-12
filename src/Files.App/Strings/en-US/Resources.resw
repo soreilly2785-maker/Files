@@ -4783,7 +4783,7 @@
     <value>Open photos in Files to create a set.</value>
   </data>
   <data name="PhotoViewerSetsDragHint" xml:space="preserve">
-    <value>Drag photos between sets. Hold Ctrl to swap photos.</value>
+    <value>Drag photos between sets. Hold Ctrl to swap photos. Ctrl+Page Up/Down switches sets.</value>
   </data>
   <data name="PhotoViewerNewSetDrop" xml:space="preserve">
     <value>Drop a photo here to create a new set</value>

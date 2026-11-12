@@ -6,6 +6,8 @@ using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Controls.Primitives;
 using Microsoft.UI.Xaml.Media;
 using System.IO;
+using Microsoft.UI.Xaml.Input;
+using Windows.System;
 using Windows.Graphics.Imaging;
 using Windows.Storage.Streams;
 using System.Runtime.InteropServices.WindowsRuntime;
@@ -43,6 +45,37 @@ namespace Files.App.Views
 			setsPanel ??= new WindowSetsWindow(this);
 			setsPanel.Activate();
 			Win32Helper.BringToForegroundEx(new(setsPanel.WindowHandle));
+		}
+
+		private static bool TryCycleSetKey(KeyRoutedEventArgs e)
+		{
+			if (e.Key is not (VirtualKey.PageUp or VirtualKey.PageDown) ||
+				!Microsoft.UI.Input.InputKeyboardSource.GetKeyStateForCurrentThread(VirtualKey.Control).HasFlag(Windows.UI.Core.CoreVirtualKeyStates.Down)) return false;
+			var sets = GetWindowSets();
+			if (sets.Length != 0)
+			{
+				var current = Array.FindIndex(sets, set => lastActiveWindow is not null && set.Windows.Contains(lastActiveWindow));
+				var direction = e.Key == VirtualKey.PageDown ? 1 : -1;
+				if (current < 0) current = direction > 0 ? -1 : 0;
+				var windows = sets[(current + direction + sets.Length) % sets.Length].Windows.ToArray();
+				MainWindow.Instance.DispatcherQueue.TryEnqueue(Microsoft.UI.Dispatching.DispatcherQueuePriority.Low, () =>
+				{
+					setsPanel?.CloseUnlessPinned();
+					ActivateWindowSet(windows);
+				});
+			}
+			e.Handled = true;
+			return true;
+		}
+
+		private static void ActivateWindowSet(PhotoViewerWindow[] windows)
+		{
+			foreach (var window in windows)
+			{
+				if (window.closed) continue;
+				if (window.Presenter is { State: Microsoft.UI.Windowing.OverlappedPresenterState.Minimized } presenter) presenter.Restore();
+				window.RaiseToFront();
+			}
 		}
 
 		private static void RefreshWindowSetsPanel() => setsPanel?.QueueRefresh();

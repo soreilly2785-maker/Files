@@ -53,6 +53,7 @@ namespace Files.App.Views
 				Grid.SetRow(newSet, 3);
 				root.Children.Add(newSet);
 				Content = root;
+				root.AddHandler(UIElement.KeyDownEvent, new KeyEventHandler((_, e) => { TryCycleSetKey(e); }), true);
 				pin.Checked += (_, _) => { if (AppWindow.Presenter is OverlappedPresenter presenter) presenter.IsAlwaysOnTop = true; };
 				pin.Unchecked += (_, _) => { if (AppWindow.Presenter is OverlappedPresenter presenter) presenter.IsAlwaysOnTop = false; };
 				scroll.SizeChanged += (_, _) => LayoutCards();
@@ -71,6 +72,11 @@ namespace Files.App.Views
 				var rows = (sets.Length + columns - 1) / columns;
 				var height = Math.Min(area.Height * 0.8, (160 + rows * 240) * scale);
 				AppWindow.MoveAndResize(new(area.X + (area.Width - (int)width) / 2, area.Y + (area.Height - (int)height) / 2, (int)width, (int)height));
+			}
+
+			internal void CloseUnlessPinned()
+			{
+				if (!closed && pin.IsChecked != true) Close();
 			}
 
 			internal void QueueRefresh()
@@ -133,12 +139,7 @@ namespace Files.App.Views
 						if (pin.IsChecked != true) Close();
 						DispatcherQueue.TryEnqueue(DispatcherQueuePriority.Low, () =>
 						{
-							foreach (var window in windows)
-							{
-								if (window.closed) continue;
-								if (window.Presenter is { State: OverlappedPresenterState.Minimized } presenter) presenter.Restore();
-								window.RaiseToFront();
-							}
+							ActivateWindowSet(windows);
 						});
 					};
 					buttons.Add(button);

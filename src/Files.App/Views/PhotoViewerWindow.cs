@@ -305,6 +305,7 @@ namespace Files.App.Views
 		private void OnKeyDown(object sender, KeyRoutedEventArgs e)
 		{
 			if (deleting) return;
+			if (TryCycleSetKey(e)) return;
 			switch (e.Key)
 			{
 				case VirtualKey.Delete:
