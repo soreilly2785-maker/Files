@@ -48,7 +48,7 @@ namespace Files.App.Views
 				scroll.Content = cards;
 				Grid.SetRow(scroll, 2);
 				root.Children.Add(scroll);
-				var newSet = new Border { Padding = new(12), CornerRadius = new(6), BorderThickness = new(1), BorderBrush = new SolidColorBrush(Microsoft.UI.Colors.Gray), Child = new TextBlock { Text = Strings.PhotoViewerNewSetDrop.GetLocalizedResource(), HorizontalAlignment = HorizontalAlignment.Center } };
+				var newSet = new Border { Background = new SolidColorBrush(Microsoft.UI.Colors.Transparent), Padding = new(12), CornerRadius = new(6), BorderThickness = new(1), BorderBrush = new SolidColorBrush(Microsoft.UI.Colors.Gray), Child = new TextBlock { Text = Strings.PhotoViewerNewSetDrop.GetLocalizedResource(), HorizontalAlignment = HorizontalAlignment.Center } };
 				ConfigureDrop(newSet, null, null);
 				Grid.SetRow(newSet, 3);
 				root.Children.Add(newSet);
@@ -105,7 +105,7 @@ namespace Files.App.Views
 					var content = new Grid { RowSpacing = 6 };
 					content.RowDefinitions.Add(new() { Height = GridLength.Auto });
 					content.RowDefinitions.Add(new() { Height = new(1, GridUnitType.Star) });
-					content.Children.Add(new TextBlock { Text = string.Format(Strings.PhotoViewerSetLabel.GetLocalizedResource(), index + 1, windows.Length) });
+					content.Children.Add(new TextBlock { Text = string.Format((windows.Length == 1 ? Strings.PhotoViewerSetLabelSingle : Strings.PhotoViewerSetLabel).GetLocalizedResource(), index + 1, windows.Length) });
 					var previewGrid = new Grid { ColumnSpacing = 4, RowSpacing = 4 };
 					for (var column = 0; column < set.Columns; column++) previewGrid.ColumnDefinitions.Add(new() { Width = new(1, GridUnitType.Star) });
 					for (var row = 0; row < set.Rows; row++) previewGrid.RowDefinitions.Add(new() { Height = new(1, GridUnitType.Star) });
@@ -132,12 +132,12 @@ namespace Files.App.Views
 					}
 					Grid.SetRow(previewGrid, 1);
 					content.Children.Add(previewGrid);
-					var button = new Button { Content = content, HorizontalContentAlignment = HorizontalAlignment.Stretch, VerticalContentAlignment = VerticalAlignment.Stretch };
+					var button = new Button { Content = content, HorizontalAlignment = HorizontalAlignment.Stretch, VerticalAlignment = VerticalAlignment.Stretch, HorizontalContentAlignment = HorizontalAlignment.Stretch, VerticalContentAlignment = VerticalAlignment.Stretch };
 					ConfigureDrop(button, set, null);
 					button.Click += (_, _) =>
 					{
 						if (pin.IsChecked != true) Close();
-						DispatcherQueue.TryEnqueue(DispatcherQueuePriority.Low, () =>
+						MainWindow.Instance.DispatcherQueue.TryEnqueue(DispatcherQueuePriority.Low, () =>
 						{
 							ActivateWindowSet(windows);
 						});

@@ -4857,6 +4857,9 @@
   <data name="PhotoViewerWindowSets" xml:space="preserve">
     <value>Window sets…</value>
   </data>
+  <data name="PhotoViewerSetLabelSingle" xml:space="preserve">
+    <value>Set {0} · 1 photo</value>
+  </data>
   <data name="PhotoViewerSetLabel" xml:space="preserve">
     <value>Set {0} · {1} photos</value>
   </data>
