@@ -144,7 +144,7 @@ namespace Files.App.Views
 				var desired = DesiredScale();
 				if (!closed && HasCurrentPhoto && (desired > decodedScale * 1.1 || desired < decodedScale * 0.7)) StartLoad(false);
 			};
-			canvas.SizeChanged += (_, _) => { UpdateViewport(); FitImage(); resizeTimer.Stop(); resizeTimer.Start(); UpdateDragRegions(); };
+			canvas.SizeChanged += (_, _) => { UpdateViewport(); FitImage(); RefreshWindowSetViews(); resizeTimer.Stop(); resizeTimer.Start(); UpdateDragRegions(); };
 			windowControls.SizeChanged += (_, _) => UpdateDragRegions();
 			host.Loaded += (_, _) => UpdateDragRegions();
 			Closed += (_, _) =>
@@ -268,7 +268,7 @@ namespace Files.App.Views
 			Add(Strings.PhotoViewerSaveAs.GetLocalizedResource(), () => _ = ExportAsync(true), new SymbolIcon(Symbol.Save));
 			Add(Strings.PhotoViewerEnlargeScreen.GetLocalizedResource(), () => _ = ExportAsync(true, true));
 			menu.Items.Add(new MenuFlyoutSeparator());
-			Add(Strings.RotateRight.GetLocalizedResource(), () => { rotation = (rotation + 1) % 4; FitImage(); resizeTimer.Start(); RefreshWindowSetsPanel(); }, new SymbolIcon(Symbol.Rotate));
+			Add(Strings.RotateRight.GetLocalizedResource(), () => { presentationRevision++; rotation = (rotation + 1) % 4; FitImage(); resizeTimer.Start(); RefreshWindowSetsPanel(); }, new SymbolIcon(Symbol.Rotate));
 			Add(Strings.PhotoViewerFlipHorizontal.GetLocalizedResource(), () => Flip(false));
 			Add(Strings.PhotoViewerFlipVertical.GetLocalizedResource(), () => Flip(true));
 			menu.Items.Add(new MenuFlyoutSeparator());
@@ -281,6 +281,7 @@ namespace Files.App.Views
 
 		private void Flip(bool vertical)
 		{
+			presentationRevision++;
 			// Represent every orientation as a horizontal flip followed by a rotation.
 			if (vertical != (rotation % 2 == 1))
 				rotation = (rotation + 2) % 4;

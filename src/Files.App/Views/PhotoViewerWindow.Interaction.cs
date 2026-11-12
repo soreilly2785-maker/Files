@@ -41,6 +41,7 @@ namespace Files.App.Views
 			image.PointerPressed += (_, e) =>
 			{
 				if (!HasCurrentPhoto || !e.GetCurrentPoint(canvas).Properties.IsLeftButtonPressed || !image.CapturePointer(e.Pointer)) return;
+				presentationRevision++;
 				panPointer = e.Pointer.PointerId;
 				panStart = e.GetCurrentPoint(canvas).Position;
 				panOrigin = new(panX, panY);
@@ -53,6 +54,7 @@ namespace Files.App.Views
 				panX = panOrigin.X + point.X - panStart.X;
 				panY = panOrigin.Y + point.Y - panStart.Y;
 				FitImage();
+				RefreshWindowSetViews();
 				e.Handled = true;
 			};
 			image.PointerReleased += (_, e) =>
@@ -70,6 +72,7 @@ namespace Files.App.Views
 			if (!HasCurrentPhoto) return;
 			var point = e.GetCurrentPoint(canvas);
 			if (point.Properties.IsHorizontalMouseWheel) return;
+			presentationRevision++;
 			zoom = EffectiveZoom();
 			fillWindow = false;
 			var nextZoom = Math.Clamp(zoom * Math.Pow(1.1, point.Properties.MouseWheelDelta / 120d), 0.1, 32);
@@ -80,6 +83,7 @@ namespace Files.App.Views
 			FitImage();
 			resizeTimer.Stop();
 			resizeTimer.Start();
+			RefreshWindowSetViews();
 			e.Handled = true;
 		}
 
@@ -103,12 +107,14 @@ namespace Files.App.Views
 
 		private void ResetImageTransform(bool clearFill)
 		{
+			presentationRevision++;
 			if (clearFill) fillWindow = false;
 			panPointer = null;
 			image.ReleasePointerCaptures();
 			zoom = 1;
 			panX = panY = 0;
 			FitImage();
+			RefreshWindowSetViews();
 			resizeTimer.Stop();
 			resizeTimer.Start();
 		}

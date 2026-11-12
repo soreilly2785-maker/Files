@@ -25,6 +25,8 @@ namespace Files.App.Views
 			private readonly ScrollViewer scroll = new() { HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled, VerticalScrollBarVisibility = ScrollBarVisibility.Auto };
 			private readonly ToggleButton pin = new() { Content = Strings.PhotoViewerPinSets.GetLocalizedResource() };
 			private readonly List<Button> buttons = [];
+			private readonly List<Action> updatePreviews = [];
+			private bool viewRefreshPending;
 			private PhotoViewerWindow? draggingPhoto;
 			private bool active;
 			private bool closed;
@@ -79,6 +81,17 @@ namespace Files.App.Views
 				if (!closed && pin.IsChecked != true) Close();
 			}
 
+			internal void QueueViewRefresh()
+			{
+				if (closed || viewRefreshPending || refreshPending) return;
+				viewRefreshPending = true;
+				DispatcherQueue.TryEnqueue(DispatcherQueuePriority.Low, () =>
+				{
+					viewRefreshPending = false;
+					if (!closed && !refreshPending) foreach (var update in updatePreviews) update();
+				});
+			}
+
 			internal void QueueRefresh()
 			{
 				if (closed || refreshPending) return;
@@ -96,6 +109,7 @@ namespace Files.App.Views
 			{
 				cards.Children.Clear();
 				buttons.Clear();
+				updatePreviews.Clear();
 				var sets = GetWindowSets();
 				if (sets.Length == 0) cards.Children.Add(new TextBlock { Text = Strings.PhotoViewerNoSets.GetLocalizedResource(), TextWrapping = TextWrapping.Wrap });
 				for (var index = 0; index < sets.Length; index++)
@@ -106,32 +120,63 @@ namespace Files.App.Views
 					content.RowDefinitions.Add(new() { Height = GridLength.Auto });
 					content.RowDefinitions.Add(new() { Height = new(1, GridUnitType.Star) });
 					content.Children.Add(new TextBlock { Text = string.Format((windows.Length == 1 ? Strings.PhotoViewerSetLabelSingle : Strings.PhotoViewerSetLabel).GetLocalizedResource(), index + 1, windows.Length) });
-					var previewGrid = new Grid { ColumnSpacing = 4, RowSpacing = 4 };
-					for (var column = 0; column < set.Columns; column++) previewGrid.ColumnDefinitions.Add(new() { Width = new(1, GridUnitType.Star) });
-					for (var row = 0; row < set.Rows; row++) previewGrid.RowDefinitions.Add(new() { Height = new(1, GridUnitType.Star) });
+					var previewHost = new Grid();
+					var previewGrid = new Canvas { HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center };
+					previewHost.Children.Add(previewGrid);
+					previewHost.SizeChanged += (_, _) =>
+					{
+						previewGrid.Width = Math.Min(previewHost.ActualWidth, previewHost.ActualHeight * set.FrameAspect);
+						previewGrid.Height = previewGrid.Width / set.FrameAspect;
+					};
+					var cells = new List<Grid>();
 					for (var i = 0; i < windows.Length; i++)
 					{
 						var window = windows[i];
-						var preview = new Image { Stretch = Stretch.Uniform, RenderTransformOrigin = new(0.5, 0.5), RenderTransform = new CompositeTransform { Rotation = window.rotation * 90, ScaleX = window.flipped ? -1 : 1 }, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center };
+						var previewTransform = new CompositeTransform();
+						var preview = new Image { Stretch = Stretch.Fill, RenderTransformOrigin = new(0.5, 0.5), RenderTransform = previewTransform, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center };
+						var clip = new RectangleGeometry();
+						var viewport = new Grid { Clip = clip, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center };
+						viewport.Children.Add(preview);
 						var cell = new Grid { Background = window.canvas.Background, CanDrag = true };
-						cell.Children.Add(preview);
-						cell.SizeChanged += (_, _) =>
+						cell.Children.Add(viewport);
+						void UpdatePreview()
 						{
-							preview.Width = window.rotation % 2 == 0 ? cell.ActualWidth : cell.ActualHeight;
-							preview.Height = window.rotation % 2 == 0 ? cell.ActualHeight : cell.ActualWidth;
-							cell.Clip = new RectangleGeometry { Rect = new Rect(0, 0, cell.ActualWidth, cell.ActualHeight) };
-						};
+							if (window.closed || !double.IsFinite(window.image.Width) || !double.IsFinite(window.image.Height)) return;
+							var scale = Math.Min(cell.ActualWidth / Math.Max(1, window.canvas.ActualWidth), cell.ActualHeight / Math.Max(1, window.canvas.ActualHeight));
+							viewport.Width = window.canvas.ActualWidth * scale;
+							viewport.Height = window.canvas.ActualHeight * scale;
+							clip.Rect = new Rect(0, 0, viewport.Width, viewport.Height);
+							preview.Width = window.image.Width * scale;
+							preview.Height = window.image.Height * scale;
+							previewTransform.Rotation = window.rotation * 90;
+							previewTransform.ScaleX = window.EffectiveZoom() * (window.flipped ? -1 : 1);
+							previewTransform.ScaleY = window.EffectiveZoom();
+							previewTransform.TranslateX = window.panX * scale;
+							previewTransform.TranslateY = window.panY * scale;
+						}
+						updatePreviews.Add(UpdatePreview);
+						cell.SizeChanged += (_, _) => UpdatePreview();
 						cell.DragStarting += (_, e) => { draggingPhoto = window; e.Data.SetData(DragFormat, string.Empty); e.AllowedOperations = DataPackageOperation.Move | DataPackageOperation.Copy; };
 						cell.DropCompleted += (_, _) => { draggingPhoto = null; QueueRefresh(); };
 						ConfigureDrop(cell, set, window);
 						ToolTipService.SetToolTip(cell, Path.GetFileName(window.paths[window.index]));
-						Grid.SetColumn(cell, i % set.Columns);
-						Grid.SetRow(cell, i / set.Columns);
+						cells.Add(cell);
 						previewGrid.Children.Add(cell);
 						_ = LoadSetPreviewAsync(preview, window.previewBytes);
 					}
-					Grid.SetRow(previewGrid, 1);
-					content.Children.Add(previewGrid);
+					previewGrid.SizeChanged += (_, _) =>
+					{
+						for (var i = 0; i < cells.Count; i++)
+						{
+							var region = set.Regions is { } regions && i < regions.Count ? regions[i] : new Files.App.Utils.PhotoLayoutPlanner.Region((i % set.Columns) / (double)set.Columns, (i / set.Columns) / (double)set.Rows, 1d / set.Columns, 1d / set.Rows);
+							Canvas.SetLeft(cells[i], region.X * previewGrid.ActualWidth);
+							Canvas.SetTop(cells[i], region.Y * previewGrid.ActualHeight);
+							cells[i].Width = Math.Max(0, region.Width * previewGrid.ActualWidth - 4);
+							cells[i].Height = Math.Max(0, region.Height * previewGrid.ActualHeight - 4);
+						}
+					};
+					Grid.SetRow(previewHost, 1);
+					content.Children.Add(previewHost);
 					var button = new Button { Content = content, HorizontalAlignment = HorizontalAlignment.Stretch, VerticalAlignment = VerticalAlignment.Stretch, HorizontalContentAlignment = HorizontalAlignment.Stretch, VerticalContentAlignment = VerticalAlignment.Stretch };
 					ConfigureDrop(button, set, null);
 					button.Click += (_, _) =>
@@ -212,23 +257,5 @@ namespace Files.App.Views
 			RefreshWindowSetsPanel();
 		}
 
-		private static void AutoArrangeSet(PhotoWindowSet set, RectInt32 area)
-		{
-			var grid = ChooseAutomaticGrid(set.Windows.ToArray(), area);
-			set.Columns = grid.Columns;
-			set.Rows = grid.Rows;
-			for (var i = 0; i < set.Windows.Count; i++)
-			{
-				var window = set.Windows[i];
-				window.Presenter?.Restore();
-				var column = i % grid.Columns;
-				var row = i / grid.Columns;
-				var left = area.X + area.Width * column / grid.Columns;
-				var top = area.Y + area.Height * row / grid.Rows;
-				var right = area.X + area.Width * (column + 1) / grid.Columns;
-				var bottom = area.Y + area.Height * (row + 1) / grid.Rows;
-				window.AppWindow.MoveAndResize(new(left, top, right - left, bottom - top));
-			}
-		}
 	}
 }

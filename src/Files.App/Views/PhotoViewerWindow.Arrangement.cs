@@ -19,6 +19,8 @@ namespace Files.App.Views
 			internal List<PhotoViewerWindow> Windows { get; } = windows;
 			internal int Columns { get; set; } = columns;
 			internal int Rows { get; set; } = rows;
+			internal List<Files.App.Utils.PhotoLayoutPlanner.Region>? Regions { get; set; }
+			internal double FrameAspect { get; set; } = 16d / 9;
 		}
 
 		internal static bool HasOpenWindows => openWindows.Count != 0;
@@ -112,21 +114,28 @@ namespace Files.App.Views
 			if (command == "fill") { foreach (var window in windows) window.FillWindow(); return; }
 			if (command == "fit") { foreach (var window in windows) window.ResetView(); return; }
 			var area = DisplayArea.GetFromWindowId(anchor.AppWindow.Id, DisplayAreaFallback.Primary).WorkArea;
-			var automatic = command == "auto" ? ChooseAutomaticGrid(windows, area) : (Columns: 0, Rows: 0);
+			if (command == "auto")
+			{
+				windowSets.Clear();
+				var set = new PhotoWindowSet(windows.ToList(), 1, 1);
+				windowSets.Add(set);
+				AutoArrangeSet(set, area);
+				RefreshWindowSetsPanel();
+				anchor.RaiseToFront();
+				return;
+			}
 			var columns = command switch
 			{
 				"columns3" => 3,
 				"columns4" => 4,
 				"grid4" => 2,
 				"grid6" => 3,
-				"auto" => automatic.Columns,
 				_ => windows.Length <= 3 ? windows.Length : (int)Math.Ceiling(Math.Sqrt(windows.Length))
 			};
 			var rows = command switch
 			{
 				"columns3" or "columns4" => 1,
 				"grid4" or "grid6" => 2,
-				"auto" => automatic.Rows,
 				_ => (windows.Length + columns - 1) / columns
 			};
 			if (command is not ("maximize" or "native"))
@@ -134,7 +143,7 @@ namespace Files.App.Views
 				windowSets.Clear();
 				var batchSize = columns * rows;
 				for (var start = 0; start < windows.Length; start += batchSize)
-					windowSets.Add(new(windows.Skip(start).Take(batchSize).ToList(), columns, rows));
+					windowSets.Add(new(windows.Skip(start).Take(batchSize).ToList(), columns, rows) { FrameAspect = (double)area.Width / area.Height });
 			}
 			for (var i = 0; i < windows.Length; i++)
 			{
@@ -166,34 +175,15 @@ namespace Files.App.Views
 				foreground.RaiseToFront();
 		}
 
-		private static (int Columns, int Rows) ChooseAutomaticGrid(PhotoViewerWindow[] windows, RectInt32 area)
-		{
-			var best = (Columns: 1, Rows: windows.Length);
-			var bestCoverage = -1d;
-			for (var columns = 1; columns <= windows.Length; columns++)
-			{
-				var rows = (windows.Length + columns - 1) / columns;
-				var cellAspect = (double)area.Width * rows / (area.Height * columns);
-				var coverage = 0d;
-				foreach (var window in windows)
-				{
-					var aspect = window.pixelHeight == 0 ? 4d / 3 : (double)window.pixelWidth / window.pixelHeight;
-					if (window.rotation % 2 != 0) aspect = 1 / aspect;
-					coverage += Math.Min(aspect / cellAspect, cellAspect / aspect);
-				}
-				coverage /= columns * rows;
-				if (coverage > bestCoverage)
-				{
-					bestCoverage = coverage;
-					best = (columns, rows);
-				}
-			}
-			return best;
-		}
-
 		private static void RemoveFromWindowSets(PhotoViewerWindow window)
 		{
-			foreach (var set in windowSets) set.Windows.Remove(window);
+			foreach (var set in windowSets)
+			{
+				var index = set.Windows.IndexOf(window);
+				if (index < 0) continue;
+				set.Windows.RemoveAt(index);
+				set.Regions?.RemoveAt(index);
+			}
 			windowSets.RemoveAll(set => set.Windows.Count == 0);
 		}
 	}

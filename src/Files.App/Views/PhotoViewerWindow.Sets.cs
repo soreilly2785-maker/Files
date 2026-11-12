@@ -79,6 +79,7 @@ namespace Files.App.Views
 		}
 
 		private static void RefreshWindowSetsPanel() => setsPanel?.QueueRefresh();
+		private static void RefreshWindowSetViews() => setsPanel?.QueueViewRefresh();
 
 		private static PhotoWindowSet[] GetWindowSets()
 		{
