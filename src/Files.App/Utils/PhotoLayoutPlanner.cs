@@ -46,11 +46,28 @@ namespace Files.App.Utils
 					Consider(Join(bands.Select(band => Join(band, 0, band.Count, true)).ToArray(), 0, rows, false));
 				}
 			}
-			// Keep each frame proportional to its crop; unused space stays outside the set.
+			// Keep frames proportional to their crops while maximizing useful screen area.
 			var result = new Region[aspects.Count];
 			var width = Math.Min(1, best!.Aspect / screenAspect);
 			var height = Math.Min(1, screenAspect / best.Aspect);
 			Place(best, new((1 - width) / 2, (1 - height) / 2, width, height), result);
+			for (var columns = 1; columns <= aspects.Count; columns++)
+			{
+				var rows = (aspects.Count + columns - 1) / columns;
+				var candidate = new Region[aspects.Count];
+				for (var i = 0; i < candidate.Length; i++)
+				{
+					var frameWidth = Math.Min(1d / columns, leaves[i].Aspect / (rows * screenAspect));
+					var frameHeight = frameWidth * screenAspect / leaves[i].Aspect;
+					candidate[i] = new((i % columns + 0.5) / columns - frameWidth / 2, (i / columns + 0.5) / rows - frameHeight / 2, frameWidth, frameHeight);
+				}
+				var usedArea = candidate.Sum(region => region.Width * region.Height);
+				var fairness = Math.Sqrt(Math.Clamp(candidate.Min(region => region.Width * region.Height) * aspects.Count / usedArea, 0, 1));
+				var score = usedArea * (0.92 + 0.08 * fairness);
+				if (score <= bestScore) continue;
+				bestScore = score;
+				result = candidate;
+			}
 			return result;
 		}
 
