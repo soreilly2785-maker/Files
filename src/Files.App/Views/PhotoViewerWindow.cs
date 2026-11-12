@@ -304,7 +304,7 @@ namespace Files.App.Views
 
 		private void OnKeyDown(object sender, KeyRoutedEventArgs e)
 		{
-			if (deleting) return;
+			if (deleting || (e.Key == VirtualKey.Escape && e.Handled)) return;
 			if (TryCycleSetKey(e)) return;
 			switch (e.Key)
 			{
